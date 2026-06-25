@@ -114,7 +114,7 @@ static const wchar_t* dc_dcs_img_file = L"\\EFIBOOT.IMG";
 
 // shim for secure boot
 #ifdef _M_IX86
-static const wchar_t* shim_zip_file = L"Shim_IA32";
+static const wchar_t* shim_zip_file = L"ShimPkg_IA32";
 static const efi_file_t shim_files[] = {
 	{L"shimia32.efi",		L"\\EFI\\Boot\\shimia32.efi"}, // shim
 	{L"mmia32.efi",			L"\\EFI\\Boot\\mmia32.efi"},
@@ -123,7 +123,7 @@ static const efi_file_t shim_files[] = {
 };
 static const wchar_t* shim_boot_file = L"\\EFI\\Boot\\grubia32.efi";
 #elif defined(_M_ARM64)
-static const wchar_t* shim_zip_file = L"Shim_AA64";
+static const wchar_t* shim_zip_file = L"ShimPkg_AA64";
 static const efi_file_t shim_files[] = {
 	{L"shimaa64.efi",		L"\\EFI\\Boot\\shimaa64.efi"}, // shim
 	{L"mmaa64.efi",			L"\\EFI\\Boot\\mmaa64.efi"},
@@ -132,7 +132,7 @@ static const efi_file_t shim_files[] = {
 };
 static const wchar_t* shim_boot_file = L"\\EFI\\Boot\\grubaa64.efi";
 #else
-static const wchar_t* shim_zip_file = L"Shim_X64";
+static const wchar_t* shim_zip_file = L"ShimPkg_X64";
 static const efi_file_t shim_files[] = {
 	{L"shimx64.efi",		L"\\EFI\\Boot\\shimx64.efi"}, // shim
 	{L"mmx64.efi",			L"\\EFI\\Boot\\mmx64.efi"},

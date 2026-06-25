@@ -452,13 +452,13 @@ static const DC_OFFLINE_FILE g_offline_files[] = {
 	{ L"dcapi.dll",		L"Program Files\\dcrypt\\dcapi.dll" },
 #ifdef _M_IX86
 	{ L"DcsPkg_IA32.zip",L"Program Files\\dcrypt\\DcsPkg_IA32.zip" },
-	{ L"Shim_IA32.zip",  L"Program Files\\dcrypt\\Shim_IA32.zip" },
+	{ L"ShimPkg_IA32.zip",  L"Program Files\\dcrypt\\ShimPkg_IA32.zip" },
 #elifdef _M_ARM64
 	{ L"DcsPkg_AA64.zip",L"Program Files\\dcrypt\\DcsPkg_AA64.zip" },
-	{ L"Shim_AA64.zip",  L"Program Files\\dcrypt\\Shim_AA64.zip" },
+	{ L"ShimPkg_AA64.zip",  L"Program Files\\dcrypt\\ShimPkg_AA64.zip" },
 #else
 	{ L"DcsPkg_X64.zip",L"Program Files\\dcrypt\\DcsPkg_X64.zip" },
-	{ L"Shim_X64.zip",  L"Program Files\\dcrypt\\Shim_X64.zip" },
+	{ L"ShimPkg_X64.zip",  L"Program Files\\dcrypt\\ShimPkg_X64.zip" },
 #endif
 	{ L"dcinst.exe",	L"Program Files\\dcrypt\\dcinst.exe" },
 	{ L"license.txt",	L"Program Files\\dcrypt\\license.txt" }
