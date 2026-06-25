@@ -1,0 +1,77 @@
+## @file
+#  DCS TPM Driver - TPM interface for DiskCryptor
+#
+#  This driver provides TPM functionality for disk encryption,
+#  including key unsealing and TPM status management.
+#
+#  Copyright (c) 2026 David Xanatos. All rights reserved.
+#
+##
+
+[Defines]
+  INF_VERSION               = 0x00010005
+  BASE_NAME                 = DcsTpm
+  FILE_GUID                 = B2A5E8C1-4D3F-4A2B-9C7E-1F8D6A3B5C0E
+  MODULE_TYPE               = UEFI_DRIVER
+  VERSION_STRING            = 1.0
+  ENTRY_POINT               = DcsTpmMain
+  UNLOAD_IMAGE              = DcsTpmUnload
+
+[Sources]
+  DcsTpm.h
+  DcsTpm.c
+  DcsTpmProto.h
+  TpmLib.h
+  TpmLib.c
+  Tpm12.c
+  Tpm20.c
+  ComponentName.c
+  ComponentName.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  SecurityPkg/SecurityPkg.dec
+  CryptoPkg/CryptoPkg.dec
+  DcsPkg/DcsPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiDriverEntryPoint
+  UefiLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  PrintLib
+  DebugLib
+  Tpm12DeviceLib
+  Tpm2DeviceLib
+  Tpm2CommandLib
+  BaseCryptLib
+  MiscUtilsLib
+
+[Guids]
+  gEfiFileInfoGuid
+  gEfiPartTypeSystemPartGuid
+  gEfiPhysicalPresenceGuid        ## TPM 1.2 Physical Presence
+  gEfiTcg2PhysicalPresenceGuid    ## TPM 2.0 Physical Presence
+
+[Protocols]
+  gEfiComponentName2ProtocolGuid
+  gEfiComponentNameProtocolGuid
+  gEfiTcgProtocolGuid             ## CONSUMES
+  gEfiTcg2ProtocolGuid            ## CONSUMES
+
+
+#
+#  VALID_ARCHITECTURES           = IA32 X64 AARCH64
+#
+
+[BuildOptions.IA32]
+MSFT:RELEASE_*_IA32_CC_FLAGS  =  /arch:IA32 /FAcs
+MSFT:DEBUG_*_IA32_CC_FLAGS    = /arch:IA32 /FAcs
+MSFT:NOOPT_*_IA32_CC_FLAGS    = /arch:IA32  /FAcs
+
+[BuildOptions.AARCH64]
+# No specific flags needed for AARCH64
+
