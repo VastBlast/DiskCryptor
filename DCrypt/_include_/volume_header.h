@@ -33,12 +33,8 @@
 #define VF_STORAGE_FILE   0x04              // redirected area are placed in file
 #define VF_NO_REDIR       0x08              // redirection area is not present - iso/file container
 #define VF_EXTENDED       0x10              // this volume placed on extended partition (used only by MBR bootloader)
-
 #define VF_BACKUP_HEADER  0x20              // backup header at partition end
-
-/* Request-only flags (not stored in header) */
-#define VF_USE_SLACK      0x40              // try to use slack space after the filesystem for redirection area
-#define VF_TRY_SHRINK     0x80              // try to shrink filesystem to create slack space
+#define VF_NO_HIBER       0x40				// this volume must be unmounted before hibernation
 
 #pragma pack (push, 1)
 

@@ -68,6 +68,7 @@ typedef struct _keys_dlg_state {
     BOOL            initializing;       /* TRUE during control initialization */
     u32             modified;           /* HF_UPDATE_* flags for pending changes */
     u32             orig_disk_id;       /* For change detection */
+    BOOL            orig_no_hiber;      /* Original VF_NO_HIBER state */
 
     int             selected_slot;      /* Currently selected slot index (-1 if none) */
     BOOL            slot_edit_mode;     /* TRUE if in slot editor view */
@@ -993,6 +994,7 @@ static INT_PTR CALLBACK _keys_props_proc(
             /* Setup controls */
             _sub_class(GetDlgItem(hwnd, IDC_CHECK_EXT_HEADER), SUB_STATIC_PROC, HWND_NULL);
             _sub_class(GetDlgItem(hwnd, IDC_CHECK_HDR_BACKUP), SUB_STATIC_PROC, HWND_NULL);
+            _sub_class(GetDlgItem(hwnd, IDC_CHECK_NO_HIBER), SUB_STATIC_PROC, HWND_NULL);
 
             /* Set header text */
             SetWindowText(GetDlgItem(hwnd, IDC_HEAD_VERSION), L"# Header Format");
@@ -1116,6 +1118,16 @@ static INT_PTR CALLBACK _keys_props_proc(
                 case IDC_EDIT_DISK_ID:
                 {
                     if (code == EN_CHANGE && state && !state->initializing)
+                    {
+                        state->modified |= HF_UPDATE_BASE;
+                        EnableWindow(GetDlgItem(GetParent(GetParent(hwnd)), IDC_BTN_APPLY), TRUE);
+                    }
+                    return TRUE;
+                }
+
+                case IDC_CHECK_NO_HIBER:
+                {
+                    if (state && !state->initializing)
                     {
                         state->modified |= HF_UPDATE_BASE;
                         EnableWindow(GetDlgItem(GetParent(GetParent(hwnd)), IDC_BTN_APPLY), TRUE);
@@ -2246,6 +2258,10 @@ static void _update_props_controls(HWND hwnd, keys_dlg_state* state)
     _snwprintf(buf, countof(buf), L"%08X", state->header->disk_id);
     SetDlgItemText(hwnd, IDC_EDIT_DISK_ID, buf);
     state->orig_disk_id = state->header->disk_id;
+
+    /* Unmount on hibernation checkbox */
+    state->orig_no_hiber = (state->header->flags & VF_NO_HIBER) ? TRUE : FALSE;
+    _set_check(hwnd, IDC_CHECK_NO_HIBER, state->orig_no_hiber);
 }
 
 /*
@@ -2715,6 +2731,13 @@ static int _apply_header_changes(HWND hwnd, keys_dlg_state *state, dc_header** o
         update_header->disk_id = (u32)wcstoul(buf, NULL, 16);
         if (!update_header->disk_id)// if parsing failed or zero, keep original disk ID
 			update_header->disk_id = state->orig_disk_id;
+
+        // update VF_NO_HIBER flag from checkbox
+        if (_get_check(h_props, IDC_CHECK_NO_HIBER)) {
+            update_header->flags |= VF_NO_HIBER;
+        } else {
+            update_header->flags &= ~VF_NO_HIBER;
+        }
     }
 
     update_header->hdr_crc = calculate_header_crc_um(update_header);

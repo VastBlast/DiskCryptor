@@ -108,6 +108,8 @@ static void print_usage(int subject)
 		L"    -p  [password]               Get password from command line\n"
 		L"    -kdf [key derivation]        KDF type: 0 - PBKDF2, 1-10 - Argon2id\n"
 		L"    -kf [keyfiles path]          Use keyfiles\n"
+		L"    -ro						   Mount volume read-only\n"
+		L"    -no_hiber 				   Force unmount on hibernation\n"
 		L" -mountall [param]               Mount all encrypted devices\n"
 		L"    -p  [password]               Get password from command line\n"
 		L"    -kdf [key derivation]        KDF type: 0 - PBKDF2, 1-10 - Argon2id\n"
@@ -1225,6 +1227,10 @@ int wmain(int argc, wchar_t *argv[])
 				flags |= MF_READ_ONLY;
 			}
 
+			if (is_param(L"-no_hiber") != 0) {
+				flags |= MF_NO_HIBER;
+			}
+
 			if (is_param(L"-use_backup") != 0) {
 				flags |= MF_USE_BACKUP;
 			}
@@ -1384,10 +1390,10 @@ int wmain(int argc, wchar_t *argv[])
 			}
 
 			if (is_param(L"-try_schrink")) {
-				flags |= (VF_USE_SLACK | VF_TRY_SHRINK);
+				crypt.flags |= (EF_USE_SLACK | EF_TRY_SHRINK);
 			}
 			else if (is_param(L"-use_slack")) {
-				flags |= VF_USE_SLACK;
+				crypt.flags |= EF_USE_SLACK;
 			}
 
 			if (inf->status.flags & F_SYNC) 

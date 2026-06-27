@@ -125,11 +125,107 @@ NTSTATUS dc_create_close_irp(PDEVICE_OBJECT dev_obj, PIRP irp)
 	return dc_complete_irp(irp, status, 0);
 }
 
-static 
+/*
+* Erase encryption keys for all F_NO_HIBER volumes before hibernation.
+* This prevents key material from being written to the hibernation file.                                                                    
+*/
+static void dc_prepare_hiber_erase_unmount(dev_hook *hook)
+{
+	DbgMsg("erasing keys for hibernation, dev=%ws\n", hook->dev_name);
+
+	// Block I/O and mark for post-resume cleanup
+	hook->flags |= (F_DISABLE | F_HIBER_ERASE);
+
+	// Securely erase all encryption keys
+	if (hook->dsk_key != NULL) {
+		RtlSecureZeroMemory(hook->dsk_key, sizeof(xts_key));
+	}
+	if (hook->tmp_key != NULL) {
+		RtlSecureZeroMemory(hook->tmp_key, sizeof(xts_key));
+	}
+	if (hook->hdr_key != NULL) {
+		RtlSecureZeroMemory(hook->hdr_key, sizeof(xts_key));
+	}
+	if (hook->bak_key != NULL) {
+		RtlSecureZeroMemory(hook->bak_key, sizeof(xts_key));
+	}
+
+	// Flush CPU caches to ensure keys not recoverable
+	__wbinvd();
+}
+
+/*
+ * Complete unmount and attempt auto-remount for a single F_HIBER_ERASE volume.
+ * Called after resume from hibernation with busy_lock NOT held.
+ */
+static void dc_complete_hiber_erase_unmount(dev_hook *hook)
+{
+	DbgMsg("attempting auto-remount after resume, dev=%ws\n", hook->dev_name);
+
+	wait_object_infinity(&hook->busy_lock);
+
+	// Complete the unmount (free zeroed key structures)
+	hook->flags &= ~(F_CLEAR_ON_UNMOUNT | F_DISABLE);
+	hook->flags |= F_FS_RAW;
+
+	if (hook->dsk_key != NULL) {
+		mm_secure_free(hook->dsk_key);
+		hook->dsk_key = NULL;
+	}
+	if (hook->tmp_key != NULL) {
+		mm_secure_free(hook->tmp_key);
+		hook->tmp_key = NULL;
+	}
+	if (hook->hdr_key != NULL) {
+		mm_secure_free(hook->hdr_key);
+		hook->hdr_key = NULL;
+	}
+	if (hook->bak_key != NULL) {
+		mm_secure_free(hook->bak_key);
+		hook->bak_key = NULL;
+	}
+
+	hook->use_size = hook->dsk_size;
+	hook->tmp_size = 0;
+	lock_inc(&hook->chg_mount);
+
+	KeReleaseMutex(&hook->busy_lock, FALSE);
+
+	// Attempt auto-remount using cached passwords/boot keys
+	// dc_mount_device acquires busy_lock internally, so we must release it first
+	if (dc_mount_device(hook->dev_name, NULL, MF_NO_HIBER, NULL) == ST_OK)
+	{
+		DbgMsg("auto-remount successful, dev=%ws\n", hook->dev_name);
+	}
+	else
+	{
+		DbgMsg("auto-remount failed (no cached password), dev=%ws\n", hook->dev_name);
+	}
+}
+
+/*
+ * Complete unmount for all F_HIBER_ERASE volumes after resume from hibernation.
+ * Must be called with NO busy_lock held.
+ */
+static void dc_complete_pending_unmounts()
+{
+	dev_hook *hook;
+
+	for (hook = dc_first_hook(); hook != NULL; hook = dc_next_hook(hook))
+	{
+		if (hook->flags & F_HIBER_ERASE)
+		{
+			dc_complete_hiber_erase_unmount(hook);
+		}
+	}
+}
+
+static
 NTSTATUS dc_process_power_irp(dev_hook *hook, PIRP irp)
 {
 	NTSTATUS           status;
 	PIO_STACK_LOCATION irp_sp;
+	int                do_critical_unmounts = 0;
 
 	irp_sp = IoGetCurrentIrpStackLocation(irp);
 
@@ -153,6 +249,13 @@ NTSTATUS dc_process_power_irp(dev_hook *hook, PIRP irp)
 #else
 			dc_send_sync_packet(hook->dev_name, S_OP_SYNC, 0);
 #endif
+
+			// Erase keys for THIS F_NO_HIBER volume BEFORE hibernation
+			// Each device receives its own power IRP, so we only handle this hook
+			if ((hook->flags & F_ENABLED) && (hook->flags & F_NO_HIBER))
+			{
+				dc_prepare_hiber_erase_unmount(hook);
+			}
 		}
 
 		if (irp_sp->Parameters.Power.State.SystemState == PowerSystemWorking)
@@ -161,16 +264,28 @@ NTSTATUS dc_process_power_irp(dev_hook *hook, PIRP irp)
 			{
 				// search bootloader password in memory after hibernation
 				dc_get_boot_pass();
-				if ( !(dc_conf_flags & CONF_CACHE_PASSWORD) ) dc_clean_pass_cache();
 
 				// initialize encryption again, because CPU capabilities may be changed
 				dc_init_encryption();
+
+				// Mark that we need to do critical unmounts after releasing busy_lock
+				do_critical_unmounts = 1;
 			}
 			// allow encryption requests
 			hook->flags &= ~F_PREVENT_ENC;
 		}
 
 		KeReleaseMutex(&hook->busy_lock, FALSE);
+
+		// Complete unmount and attempt auto-remount for F_NO_HIBER volumes
+		// This must be done AFTER releasing busy_lock to avoid deadlock with dc_mount_device
+		if (do_critical_unmounts)
+		{
+			dc_complete_pending_unmounts();
+
+			// clean password cache if CONF_CACHE_PASSWORD is not set
+			dc_clear_secrets(FALSE);
+		}
 	}
 
 	PoStartNextPowerIrp(irp);

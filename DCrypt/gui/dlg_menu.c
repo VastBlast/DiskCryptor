@@ -1040,6 +1040,7 @@ void _menu_mount(
 {
 	wchar_t mnt_point[MAX_PATH] = { 0 };
 	wchar_t vol[MAX_PATH];
+	int flags = 0;
 
 	dlgpass dlg_info = { NULL, node, PF_MOUNT_OPTIONS, NULL, NULL, mnt_point};
 
@@ -1052,7 +1053,11 @@ void _menu_mount(
 	{
 		if ( _dlg_get_pass(__dlg, &dlg_info) == ST_OK )
 		{
-			rlt = _wait_dc_mount_volume( __dlg, node->mnt.info.device, dlg_info.pass, ( (mnt_point[0] != 0) ? MF_DELMP : 0 ) | ( dlg_info.mnt_ro ? MF_READ_ONLY : 0 ) | ( dlg_info.use_backup ? MF_USE_BACKUP : 0 ), L"Mounting volume..." );
+			if (mnt_point[0] != 0)   flags = MF_DELMP;
+			if (dlg_info.mnt_ro)     flags = MF_READ_ONLY;
+			if (dlg_info.no_hiber)   flags = MF_NO_HIBER;
+			if (dlg_info.use_backup) flags = MF_USE_BACKUP;
+			rlt = _wait_dc_mount_volume( __dlg, node->mnt.info.device, dlg_info.pass, flags, L"Mounting volume..." );
 			secure_free( dlg_info.pass );
 
 			if ( rlt == ST_OK )
@@ -1085,14 +1090,18 @@ void _menu_mount(
 void _menu_mountall( )
 {
 	dlgpass dlg_info  = { NULL, NULL, PF_MOUNT_OPTIONS };
-	int     mount_cnt = 0;	
+	int     mount_cnt = 0;
+	int     flags = 0;	
 
 	_wait_dc_mount_all(__dlg, NULL, &mount_cnt, 0, L"Mounting volumes...");
 	if ( mount_cnt == 0 )
 	{
 		if ( _dlg_get_pass(__dlg, &dlg_info) == ST_OK )
 		{
-			_wait_dc_mount_all( __dlg, dlg_info.pass, &mount_cnt, ( dlg_info.mnt_ro ? MF_READ_ONLY : 0 ) | ( dlg_info.use_backup ? MF_USE_BACKUP : 0 ), L"Mounting volumes..." );
+			if (dlg_info.mnt_ro)     flags = MF_READ_ONLY;
+			if (dlg_info.no_hiber)   flags = MF_NO_HIBER;
+			if (dlg_info.use_backup) flags = MF_USE_BACKUP;
+			_wait_dc_mount_all( __dlg, dlg_info.pass, &mount_cnt, flags, L"Mounting volumes..." );
 			secure_free( dlg_info.pass );
 
 			__msg_i( __dlg, L"Mounted devices: %d", mount_cnt );

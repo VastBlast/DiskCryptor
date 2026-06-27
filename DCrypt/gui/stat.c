@@ -363,11 +363,25 @@ void _update_info_table(
 				wcscat_s(buff, countof(buff), L"]");
 
 				_list_set_item_text( __lists[HMAIN_INFO], 5, 1, buff );
+
+				// Options (item 6)
+				{
+					wchar_t options[128] = L"";
+					if (node->mnt.info.status.mnt_flags & MF_READ_ONLY) {
+						wcscat_s(options, countof(options), L"Read-only");
+					}
+					if (node->mnt.info.status.flags & F_NO_HIBER) {
+						if (options[0]) wcscat_s(options, countof(options), L", ");
+						wcscat_s(options, countof(options), L"Unmount on hibernation");
+					}
+					_list_set_item_text( __lists[HMAIN_INFO], 6, 1, options[0] ? options : STR_EMPTY );
+				}
 			}
 			else
 			{
 				_list_set_item_text( __lists[HMAIN_INFO], 4, 1, STR_EMPTY );
 				_list_set_item_text( __lists[HMAIN_INFO], 5, 1, STR_EMPTY );
+				_list_set_item_text( __lists[HMAIN_INFO], 6, 1, STR_EMPTY );
 			}
 
 			idt_inf_enb = TRUE;
@@ -423,7 +437,7 @@ void _update_info_table(
 	}
 	if ( !idt_inf_enb )
 	{
-		for ( k = 0; k < 6; k++ ) 
+		for ( k = 0; k < 7; k++ )
 		{
 			_list_set_item_text( __lists[HMAIN_INFO], k, 1, STR_NULL );
 		}

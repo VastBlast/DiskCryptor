@@ -3,6 +3,7 @@
 
 #include "dcapi.h"
 #include "bootloader.h"
+#include "volume_header.h"
 
 extern dc_api const wchar_t* efi_var_guid;
 extern dc_api const wchar_t* sb_var_guid;
@@ -61,7 +62,7 @@ int dc_api dc_efi_del_bme();
 int dc_api dc_efi_is_bme_set(int dsk_num);
 int dc_api dc_efi_del_msft_bme();
 
-int dc_api dc_prep_encrypt(const wchar_t *device, struct _dc_pass *password, struct _crypt_info *crypt, int flags);
+int dc_api dc_prep_encrypt(const wchar_t *device, dc_pass *password, struct _crypt_info *crypt, int flags);
 int dc_api dc_has_pending_header(const wchar_t* device);
 int dc_api dc_clear_pending_header(const wchar_t* device);
 int dc_api dc_get_pending_header_nt(const wchar_t* device, wchar_t* path);

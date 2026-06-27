@@ -14,6 +14,8 @@ void dc_clean_keys();
 void dc_set_boot_keys(struct _header_key* keys, int count);
 void dc_clean_boot_keys();
 
+void dc_clear_secrets(BOOLEAN force_cache);
+
 int dc_mount_device(wchar_t *dev_name, dc_pass *password, u32 mnt_flags, ULONG *interrupt_cmd);
 int dc_process_unmount(dev_hook *hook, int opt);
 

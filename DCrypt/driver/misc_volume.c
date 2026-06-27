@@ -544,6 +544,8 @@ int dc_update_header(wchar_t *dev_name, dc_pass *password, void *in, int size, u
 					if (ext_hdr != NULL) flags |= HF_UPDATE_EXT;
 				}
 
+				header->flags = upd_header->flags;
+
 				header->disk_id = upd_header->disk_id;
 
 				header->footer_cnt = upd_header->footer_cnt;
@@ -570,6 +572,14 @@ int dc_update_header(wchar_t *dev_name, dc_pass *password, void *in, int size, u
 
 		/* update metadata */
 		hook->crypt.version = header->version;
+
+		/* update flags */
+		if ((hook->flags & F_NO_HIBER) != (header->flags & VF_NO_HIBER)) {
+			if (header->flags & VF_NO_HIBER)
+				hook->flags |= F_NO_HIBER;
+			else
+				hook->flags &= ~F_NO_HIBER;
+		}
 
 		/* write updated volume header */
 		resl = io_write_header(hook, hdr_pos, header, hdr_key, password, flags, interrupt_cmd);

@@ -359,6 +359,7 @@
 #define IDC_CLEAR_KEY_SLOTS             1234
 #define IDC_CHECK_USE_BACKUP            1235
 #define IDC_BT_BLOCK_UNENCRYPTED        1237
+#define IDC_NO_HIBERNATION              1238
 #define ID_FILE_EXIT                    40001
 #define ID_VOLUMES_ENCRYPT              40002
 #define ID_VOLUMES_DECRYPT              40003
@@ -489,6 +490,7 @@
 #define IDC_STATIC_HEADER_SIZE          1265
 #define IDC_STATIC_VOLUME_NOTE          1267
 #define IDC_EDIT_VOLUME_NOTE            1268
+#define IDC_CHECK_NO_HIBER              1308
 #define IDC_HEAD_HDR_OPTIONS            1269
 #define IDC_RADIO_HDR_V1                1270
 #define IDC_RADIO_HDR_V2                1271

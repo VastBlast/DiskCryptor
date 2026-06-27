@@ -47,13 +47,19 @@ static NTSTATUS dc_dump_start(__in BOOLEAN is_hibernation)
 			found_dump_devices++;
 			current_dump_device = hook;
 		}
-		if (hook->flags & F_ENABLED) number_of_mounts++;
+		// count mounts only if they are not set to auto unmount on hibernate
+		if ((hook->flags & F_ENABLED) && !(hook->flags & F_NO_HIBER)) number_of_mounts++;
+	}
+
+	// prevent saving unencrypted passwords to disk
+	if (!dump_device_encrypted)
+	{
+		dc_clear_secrets(TRUE);
 	}
 
 	// if no active mounts, dump encryption not needed
 	if (number_of_mounts == 0)
 	{
-		dc_clean_pass_cache(); // prevent saving unencrypted passwords to disk
 		return STATUS_FVE_NOT_ENCRYPTED;
 	}
 
@@ -153,7 +159,8 @@ static BOOLEAN dc_dump_is_hibernation_allowed()
 										   (hook->tmp_key == NULL || hook->tmp_key->encrypt != NULL);
 			hibernation_devices++;
 		}
-		if (hook->flags & F_ENABLED) number_of_mounts++;
+		// count mountrs only if thay are mot set to auto unmount on hibernate
+		if ((hook->flags & F_ENABLED) && !(hook->flags & F_NO_HIBER)) number_of_mounts++;
 	}
 
 	// hibernation allowed if no active mounts or hibernation device is fully encrypted

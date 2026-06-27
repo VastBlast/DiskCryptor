@@ -22,42 +22,53 @@
 #define F_PENDING	    0x00010000 // this device has a pending header
 #define F_FS_RAW        0x00020000 // raw volume - no valid filesystem detected in sector 0
 #define F_HEAD_BACKUP   0x00040000 // backup header exists at partition end
+					//  0x00080000 // reserved
+#define F_NO_HIBER      0x00100000 // critical volume - erase keys on hibernation (VF_NO_HIBER)
+#define F_HIBER_ERASE   0x00200000 // keys erased for hibernation, complete unmount on resume
 
 #define F_CLEAR_ON_UNMOUNT ( \
-	F_ENABLED | F_SYNC | F_REENCRYPT | F_FORMATTING | F_PROTECT_DCSYS | F_NO_REDIRECT | F_HEAD_BACKUP )
+	F_ENABLED | F_SYNC | F_REENCRYPT | F_FORMATTING | F_PROTECT_DCSYS | F_NO_REDIRECT | F_HEAD_BACKUP | F_NO_HIBER | F_HIBER_ERASE )
+
+/* encrypt flags */
+#define EF_NONE           0x0000
+#define EF_USE_SLACK      0x0010 // try to use slack space after the filesystem for redirection area
+#define EF_TRY_SHRINK     0x0020 // try to shrink filesystem to create slack space
 
 /* unmount flags */
-#define MF_FORCE            0x01 // unmount volume if FSCTL_LOCK_VOLUME fail
-#define MF_NOFSCTL          0x02 // no send FSCTL_DISMOUNT_VOLUME
-#define MF_NOSYNC           0x04 // no stop synchronous mode thread
-#define MF_DELMP            0x08 // delete volume mount point when unmount
-#define MF_NOWAIT_IO        0x10 // no wait for IO IRPs completion
-#define MF_DECRYPTED        0x80 // volume was decrypted, don't set F_FS_RAW
+#define MF_FORCE          0x0001 // unmount volume if FSCTL_LOCK_VOLUME fail
+#define MF_NOFSCTL        0x0002 // no send FSCTL_DISMOUNT_VOLUME
+#define MF_NOSYNC         0x0004 // no stop synchronous mode thread
+#define MF_NOWAIT_IO      0x0010 // no wait for IO IRPs completion
+#define MF_DECRYPTED      0x0080 // volume was decrypted, don't set F_FS_RAW
 
 /* mount flags */
-#define MF_READ_ONLY        0x20 // mount volume as read only
-#define MF_USE_BACKUP       0x40 // try to mount from backup header
+#define MF_DELMP          0x0008 // delete volume mount point when unmount
+#define MF_READ_ONLY      0x0020 // mount volume as read only
+#define MF_NO_HIBER       0x0100 // critical volume - erase keys on hibernation (F_NO_HIBER)
+#define MF_USE_BACKUP     0x0200 // try to mount from backup header
 
 /* header operation flags */
-#define HF_DEFAULT          0x00 // default operation - write entire header
-#define HF_UPDATE_BASE      0x01 // only update header base
-#define HF_UPDATE_SLOTS     0x02 // update key slots only
-#define HF_UPDATE_EXT       0x04 // update extended header
-//#define HF_UPDATE_EXP       0x08 // update expanded header
-#define HF_CLEAR_SLOTS      0x10 // clear key slots area
-#define HF_HEADER_FILL      0x20 // wipe header sectors before updating
-#define HF_KEEP_SALT        0x40 // keep original salt
-#define HF_BACKUP_HEADER    0x80 // handle backup header at partition end instead of primary header at sector 0
+#define HF_DEFAULT        0x0000 // default operation - write entire header
+#define HF_UPDATE_BASE    0x0001 // only update header base
+#define HF_UPDATE_SLOTS   0x0002 // update key slots only
+#define HF_UPDATE_EXT     0x0004 // update extended header
+//#define HF_UPDATE_EXP     0x0008 // update expanded header
+#define HF_CLEAR_SLOTS    0x0010 // clear key slots area
+#define HF_HEADER_FILL    0x0020 // wipe header sectors before updating
+#define HF_KEEP_SALT      0x0040 // keep original salt
+#define HF_BACKUP_HEADER  0x0080 // handle backup header at partition end instead of primary header at sector 0
 
 #define HF_UPDATE_ALL (HF_UPDATE_BASE | HF_UPDATE_SLOTS | HF_UPDATE_EXT)
 
 /* Update layout flags passed by Init type & 0xFFFFFF00 */
-#define S_RESIZE_HEADER     0x0100 // resize header
+#define S_RESIZE_HEADER   0x0100 // resize header
                          // 0x0200
-#define S_BACKUP_HEADER     0x0400 // create header backup at partition end
-#define S_REMOVE_BACKUP     0x0800 // remove header backup from partition end
-#define S_STORAGE_TO_FILE   0x1000 // move storage area to file - does not reclaim slack space
-#define S_STORAGE_TO_END    0x2000 // move storage area to partition end - atempts to schrink the FS when not enough slack space is available
+#define S_BACKUP_HEADER   0x0400 // create header backup at partition end
+#define S_REMOVE_BACKUP   0x0800 // remove header backup from partition end
+#define S_STORAGE_TO_FILE 0x1000 // move storage area to file - does not reclaim slack space
+#define S_STORAGE_TO_END  0x2000 // move storage area to partition end - atempts to schrink the FS when not enough slack space is available
+                         // 0x4000
+						 // 0x8000
 
 /* operation status codes */
 #define ST_OK			    0  /* operation completed successfully */

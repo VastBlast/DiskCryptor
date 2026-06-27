@@ -702,6 +702,9 @@ int dc_mount_device(wchar_t *dev_name, dc_pass *password, u32 mnt_flags, ULONG *
 		if (hcopy->flags & VF_BACKUP_HEADER) {
 			hook->flags |= F_HEAD_BACKUP;
 		}
+		if ((hcopy->flags & VF_NO_HIBER) || (mnt_flags & MF_NO_HIBER)) {
+			hook->flags |= F_NO_HIBER;
+		}
 		if (hook->flags & F_HEAD_BACKUP && !IS_STORAGE_ON_END(hook->flags)) {
 			hook->tail_len = hook->head_len;
 			hook->tail_off = hook->stor_off + hook->stor_len - hook->tail_len;

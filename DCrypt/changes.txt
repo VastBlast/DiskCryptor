@@ -28,6 +28,7 @@
   [+] Added TPM management options to GUI
   [+] Added a mechanism to change a volumes layout (resize header, add/remove backup header, change relocation area)
   [+] Added secure desktop password entry
+  [+] Added mechanism to force dismount volumes before hibernate
 
 
 

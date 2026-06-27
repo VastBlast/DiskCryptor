@@ -123,10 +123,10 @@ static NTSTATUS dc_dispatch_irp(PDEVICE_OBJECT dev_obj, PIRP irp)
 	return hookdev_procs[irp_sp->MajorFunction](hook, irp);
 }
 
-static void dc_cleanup()
+void dc_clear_secrets(BOOLEAN force_cache)
 {
 	/* clear cached passwords */
-	if ( !(dc_conf_flags & CONF_CACHE_PASSWORD) && !(dc_boot_flags & (BDB_BF_HDR_FOUND | BDB_BF_PASS_CACHE)) ) {
+	if (force_cache || (!(dc_conf_flags & CONF_CACHE_PASSWORD) && !(dc_boot_flags & (BDB_BF_HDR_FOUND | BDB_BF_PASS_CACHE))) ) {
 		dc_clean_pass_cache();
 	}
 
@@ -142,7 +142,7 @@ static void dc_automount_thread(void *param)
 	/* complete automounting */
 	dc_mount_all(NULL, 0, NULL);
 
-	dc_cleanup();
+	dc_clear_secrets(FALSE);
 
 	PsTerminateSystemThread(STATUS_SUCCESS);
 }
@@ -157,7 +157,7 @@ static void dc_reinit_routine(PDRIVER_OBJECT drv_obj, void *context, u32 count)
 	if (dc_conf_flags & CONF_AUTOMOUNT_BOOT) {
 		start_system_thread(dc_automount_thread, NULL, NULL);
 	} else {
-		dc_cleanup();
+		dc_clear_secrets(FALSE);
 	}
 }
 

@@ -87,6 +87,7 @@ wchar_t *_info_table_items[ ] =
 	//L"Encryption mode",
 	L"Header KDF",
 	L"Header Format",
+	L"Options",
 	STR_NULL
 };
 

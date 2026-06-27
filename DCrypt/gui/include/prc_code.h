@@ -133,6 +133,7 @@ typedef struct _dlgpass
 	int		 mnt_ro;
 	int		 skip_unused;  // user selected skip unused sectors
 	int		 clear_slots;  // clear key slots when changing password
+	int		 no_hiber;     // force unmount on hibernation
 	int		 use_backup;   // use backup header when mounting
 
 } dlgpass, *pdlgpass;

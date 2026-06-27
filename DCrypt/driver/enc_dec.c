@@ -1571,7 +1571,7 @@ int dc_encrypt_start(wchar_t *dev_name, dc_pass *password, crypt_info *crypt, u3
 		}
 
 		/* Check for volume slack at partition end before creating $dcsys$ file */
-		if (flags & VF_USE_SLACK) {
+		if (crypt->flags & EF_USE_SLACK) {
 			DbgMsg("dc_encrypt_start: checking for existing volume slack\n");
 			if (dc_get_volume_slack(hook, &slack_size) == ST_OK && slack_size >= stor_len) {
 				stor_off = hook->dsk_size - stor_len;
@@ -1580,7 +1580,7 @@ int dc_encrypt_start(wchar_t *dev_name, dc_pass *password, crypt_info *crypt, u3
 		}
 
 		/* If no existing slack and VF_TRY_SHRINK flag is set, try to shrink filesystem */
-		if (stor_off == 0 && (flags & VF_USE_SLACK) && (flags & VF_TRY_SHRINK)) {
+		if (stor_off == 0 && (crypt->flags & EF_USE_SLACK) && (flags & EF_TRY_SHRINK)) {
 			DbgMsg("dc_encrypt_start: attempting to shrink filesystem\n");
 			if (dc_try_shrink_fs(hook, stor_len) == ST_OK) {
 				stor_off = hook->dsk_size - stor_len;
@@ -1598,9 +1598,6 @@ int dc_encrypt_start(wchar_t *dev_name, dc_pass *password, crypt_info *crypt, u3
 			/* Set flag to indicate storage file is used */
 			flags |= VF_STORAGE_FILE;
 		}
-
-		/* Clear request-only flags before storing in header */
-		flags &= ~( VF_USE_SLACK | VF_TRY_SHRINK );
 
 		/* allocate memory for header and keys */
 		if ( (header = (dc_header*)mm_secure_alloc(hook->head_len)) == NULL ||

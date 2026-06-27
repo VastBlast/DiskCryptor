@@ -63,7 +63,8 @@ typedef struct _crypt_info {
 	u32        head_len;
 	int        slot_count;
 	int        head_kdf;
-	u8         reserver[48];
+	u32        flags;
+	u8         reserver[44];
 } crypt_info; // 64
 
 static_assert(sizeof(crypt_info) <= DC_HEAD_SPACE, "crypt_info structure is too big to fit in volume header space");

@@ -728,6 +728,7 @@ _password_dlg_proc(
 				HWND mnt_check = GetDlgItem( hwnd, IDC_CHECK_MNT_SET );
 				HWND mnt_label = GetDlgItem( hwnd, IDC_MNT_POINT );
 				HWND mnt_ro = GetDlgItem( hwnd, IDC_CHECK_RO_SET );
+				HWND mnt_no_hiber = GetDlgItem( hwnd, IDC_NO_HIBERNATION );
 				HWND mnt_header = GetDlgItem( hwnd, IDC_HEAD_MOUNT_OPTIONS );
 
 				BOOL enable;
@@ -748,10 +749,14 @@ _password_dlg_proc(
 					ShowWindow( mnt_check, SW_HIDE );
 					ShowWindow( mnt_label, SW_HIDE );
 					ShowWindow( mnt_ro, SW_HIDE );
+					ShowWindow( mnt_no_hiber, SW_HIDE );
 				}
 
-				_sub_class( GetDlgItem(hwnd, IDC_CHECK_MNT_SET), SUB_STATIC_PROC, HWND_NULL );
+				_sub_class( mnt_check, SUB_STATIC_PROC, HWND_NULL );
 				_set_check( hwnd, IDC_CHECK_MNT_SET, enable );
+
+				_sub_class( mnt_no_hiber, SUB_STATIC_PROC, HWND_NULL );
+				_set_check( hwnd, IDC_NO_HIBERNATION, enable );
 
 			}
 			SendMessage(
@@ -950,6 +955,7 @@ _password_dlg_proc(
 					}
 
 					info->mnt_ro = _get_check(hwnd, IDC_CHECK_RO_SET);
+					info->no_hiber = _get_check(hwnd, IDC_NO_HIBERNATION);
 					info->skip_unused = _get_check(hwnd, IDC_CHECK_SKIP_UNUSED);
 					info->use_backup = _get_check(hwnd, IDC_CHECK_USE_BACKUP);
 
