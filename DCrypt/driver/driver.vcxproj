@@ -207,7 +207,7 @@
       <BaseAddress>
       </BaseAddress>
       <AdditionalOptions>/pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>cng.lib;$(SolutionDir)Bin\$(Configuration)_i386\crypto_fast_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib;BufferOverflowK.lib</AdditionalDependencies>
+      <AdditionalDependencies>Ksecdd.lib;$(SolutionDir)Bin\$(Configuration)_i386\crypto_fast_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib;BufferOverflowK.lib</AdditionalDependencies>
       <ProgramDatabaseFile>$(OutDir)$(TargetName)_sys.pdb</ProgramDatabaseFile>
     </Link>
     <PostBuildEvent />
@@ -234,7 +234,7 @@
       <SubSystem>Native</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cng.lib;$(SolutionDir)Bin\$(Configuration)_amd64\crypto_fast_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib</AdditionalDependencies>
+      <AdditionalDependencies>Ksecdd.lib;$(SolutionDir)Bin\$(Configuration)_amd64\crypto_fast_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(DDK)\lib\wlh\amd64</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <Driver>WDM</Driver>
@@ -275,7 +275,7 @@
       <SubSystem>Native</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cng.lib;$(SolutionDir)Bin\$(Configuration)_arm64\crypto_small_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ksecdd.lib;$(SolutionDir)Bin\$(Configuration)_arm64\crypto_small_km.lib;ntoskrnl.lib;hal.lib;fltmgr.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(DDK)\lib\wlh\amd64</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <Driver>WDM</Driver>
