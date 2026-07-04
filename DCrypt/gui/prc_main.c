@@ -78,6 +78,9 @@ void _init_main_dlg(
 	mnitem.fMask = MIIM_FTYPE;
 	mnitem.fType = MFT_RIGHTJUSTIFY;
 	SetMenuItemInfo( GetMenu( hwnd ), ID_HOMEPAGE, FALSE, &mnitem );
+	if (!(__config.load_flags & DST_PRO_ENABLED)) {
+		ModifyMenuW(GetMenu(hwnd), ID_HOMEPAGE, MFT_RIGHTJUSTIFY | MF_STRING, ID_HOMEPAGE, L"Get DiskCryptor Pro");
+	}
 
 	/* Disable TPM menu item if no TPM is present */
 	if ( dc_tpm_get_version() <= 0 )
@@ -825,7 +828,7 @@ _main_dialog_proc(
 			}
 			break;
 
-			case ID_HOMEPAGE : __execute( DC_HOMEPAGE ); break;
+			case ID_HOMEPAGE : __execute( !(__config.load_flags & DST_PRO_ENABLED) ? L"https://diskcryptor.org/go.php?to=dc-get-cert" : DC_HOMEPAGE ); break;
 			case ID_HELP_DONATE : __execute( L"https://diskcryptor.org/go.php?to=donate" ); break;
 			case ID_HELP_FORUM : __execute( DC_FORUMPAGE ); break;
 			case ID_EXIT :
