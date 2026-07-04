@@ -957,7 +957,7 @@ SCertInfo Verify_CertInfo = { 0 };
 
 NTSTATUS KphValidateCertificate(void)
 {
-    BOOLEAN CertDbg = TRUE;
+    BOOLEAN CertDbg = FALSE;
 
     NTSTATUS status;
     VERIFY_STREAM *stream = NULL;
@@ -1201,6 +1201,8 @@ NTSTATUS KphValidateCertificate(void)
             node_lock = TRUE;
             if (_wcsicmp(value, g_uuid_str) == 0)
                 node_pass = TRUE;
+            //else
+			//	if (CertDbg) DbgMsg("Found locked certificate for HWID %S, current HWID is %S\n", value, g_uuid_str);
         }
 
     next:
@@ -1210,7 +1212,7 @@ NTSTATUS KphValidateCertificate(void)
     if(!NT_SUCCESS(status = MyFinishHash(&hashObj, &hash, &hashSize)))
         goto CleanupExit;
 
-    if(CertDbg) DumpHex("Hash ", hash, hashSize);
+    //if(CertDbg) DumpHex("Hash ", hash, hashSize);
 
     if (!signature) {
         status = STATUS_INVALID_SECURITY_DESCR;
@@ -1584,6 +1586,9 @@ void InitFwUuid(void)
 
 NTSTATUS dc_verify_cert()
 {
+    if(!*g_uuid_str)
+        InitFwUuid();
+
     NTSTATUS status = KphValidateCertificate();
     
     if (Verify_CertInfo.active) {
