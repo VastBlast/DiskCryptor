@@ -65,7 +65,9 @@ void _init_main_dlg(
 	wchar_t      display[MAX_PATH];
 
 	DC_FLAGS2 flags;
-	dc_device_control(DC_CTL_GET_FLAGS, NULL, 0, &flags, sizeof(flags));
+	if (dc_device_control(DC_CTL_GET_FLAGS, NULL, 0, &flags, sizeof(flags)) == NO_ERROR) {
+		__config.load_flags = flags.load_flags;
+	}
 
 	_snwprintf(
 		display, countof(display), L"%s %s%S", DC_NAME, __config.load_flags & DST_PRO_ENABLED ? L"Pro " : L"", DC_PRODUCT_VER
