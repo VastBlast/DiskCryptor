@@ -325,6 +325,10 @@ int init_header_v2(dc_header *header, crypt_info *crypt, dc_pass *password)
 		header->key_slot_count = (u8)crypt->slot_count;
 		header->slot_area_len = header->key_slot_count * cp_get_key_slot_size(slot_type);
 		header->slot_info_size = sizeof(dc_slot_info);
+
+		/* fill slot area with random data */
+		cp_rand_bytes(((u8*)header) + DC_BASE_SIZE, header->slot_area_len);
+		//memset(((u8*)header) + DC_BASE_SIZE + header->slot_area_len, 0, (header->key_slot_count * header->slot_info_size));
 	}
 
 	// metadata

@@ -8,6 +8,7 @@
   [*] Fixed volume resizing corrupted backup header
   [*] Heaader editor now warns if backup header is not valid
   [*] Revised storage file handling to not schrink it unless the volume is resized
+  [*] Fixed volumes initialized with keyslots had the keyslot area zeroed
 
 [04.07.2026] - 2.0.0/885.118.237
   [+] Added Argon2id key derivation function support
