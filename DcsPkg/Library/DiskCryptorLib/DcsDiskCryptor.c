@@ -1408,9 +1408,6 @@ DcsDiskCryptor(
 		OUT_PRINT(L"Volumes Mounted: %d, Headers Approved: %d\n", vol_found, hdr_found);
 	}
 
-	if (vol_found == 0 && hdr_found > 0)
-		return EFI_SUCCESS;
-
 	// Install hooks
 	ret = MountDisks(ImageHandle, SystemTable);
 	if (EFI_ERROR(ret)) {
