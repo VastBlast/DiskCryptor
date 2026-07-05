@@ -344,9 +344,13 @@ static INT_PTR CALLBACK _wait_dlg_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARA
 
 			if (wparam == TIMER_CLOSE_DELAY)
 			{
-				/* Close delay elapsed - close the dialog */
+				/* Close delay elapsed - close the dialog only if no operation is pending.
+				 * A stale timer message may arrive if a new operation started right after
+				 * the previous one completed (KillTimer doesn't remove already-posted WM_TIMER). */
 				KillTimer(hwnd, TIMER_CLOSE_DELAY);
-				_close_wait_dialog();
+				if (!g_wait.operation_pending) {
+					_close_wait_dialog();
+				}
 				return TRUE;
 			}
 			break;
@@ -354,7 +358,13 @@ static INT_PTR CALLBACK _wait_dlg_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARA
 
 		case WM_WORKER_DONE:
 		{
-			/* Worker thread completed */
+			/* Worker thread completed - but ignore if a new operation has already started.
+			 * This can happen if a new operation began right after the previous one finished,
+			 * and this stale WM_WORKER_DONE is from the previous operation. */
+			if (g_wait.operation_pending) {
+				return TRUE;
+			}
+
 			KillTimer(hwnd, TIMER_SHOW_DELAY);
 
 			if (!g_wait.is_visible)

@@ -190,9 +190,6 @@
     <ClInclude Include="include\header_io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\inbv.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\io_control.h">
       <Filter>Header Files</Filter>
     </ClInclude>

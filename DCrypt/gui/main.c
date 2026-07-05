@@ -303,7 +303,6 @@ int WINAPI wWinMain(
 		}
 		return 0;
 	}
-#endif
 
 	if ( ver > DC_DRIVER_VER )
 	{
@@ -315,6 +314,7 @@ int WINAPI wWinMain(
 
 		return 0;
 	}
+#endif
 
 	dc_efi_init();
 

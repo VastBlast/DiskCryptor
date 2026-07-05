@@ -3,7 +3,11 @@
 [??.07.2026] - 2.0.1/886.118.238
   [*] Fixed Hwid detection issue in driver
   [*] Fixed BSOD on some ARM64 devices caused by driver
-  [*] FIxed DCS issues with some ARM64 laptops
+  [*] Fixed DCS issues with some ARM64 Qualcomm laptops
+  [*] Fixed regression volume resizing broke with 2.0
+  [*] Fixed volume resizing corrupted backup header
+  [*] Heaader editor now warns if backup header is not valid
+  [*] Revised storage file handling to not schrink it unless the volume is resized
 
 [04.07.2026] - 2.0.0/885.118.237
   [+] Added Argon2id key derivation function support

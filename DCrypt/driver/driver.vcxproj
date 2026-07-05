@@ -87,7 +87,6 @@
     <ClInclude Include="include\enc_dec.h" />
     <ClInclude Include="include\fast_crypt.h" />
     <ClInclude Include="include\header_io.h" />
-    <ClInclude Include="include\inbv.h" />
     <ClInclude Include="include\io_control.h" />
     <ClInclude Include="include\minifilter.h" />
     <ClInclude Include="include\misc.h" />

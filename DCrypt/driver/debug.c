@@ -24,7 +24,6 @@
 #include <stdarg.h>
 #include "defines.h"
 #include "debug.h"
-#include "inbv.h"
 #include "misc.h"
 
 #ifdef DBG_COM

@@ -1409,16 +1409,21 @@ NTSTATUS dc_restore_end_sectors(dev_hook *hook, void *buff)
 	NTSTATUS status;
 	u64 end_off = hook->dsk_size - hook->tail_len;
 
+	DbgMsg("dc_restore_end_sectors: dsk_size=%I64u, tail_len=%u, end_off=%I64u, tail_off=%I64u\n",
+		hook->dsk_size, hook->tail_len, end_off, hook->tail_off);
+
 	/* Read from storage via hook_dev (redirection + auto-decrypt with storage XTS) */
 	if ( !NT_SUCCESS(status = io_device_request(hook->hook_dev, IRP_MJ_READ, buff, hook->tail_len, end_off)) ) {
+		DbgMsg("dc_restore_end_sectors: read from storage failed: 0x%X\n", status);
 		return status;
 	}
 
 	/* Encrypt with partition end XTS tweak and write to actual partition end */
-	cp_fast_encrypt(buff, buff, hook->tail_len, end_off - hook->tail_len, hook->dsk_key);
+	cp_fast_encrypt(buff, buff, hook->tail_len, end_off, hook->dsk_key);
 
 	/* Write to actual partition end via orig_dev (raw encrypted) */
 	status = io_device_request(hook->orig_dev, IRP_MJ_WRITE, buff, hook->tail_len, end_off);
+	DbgMsg("dc_restore_end_sectors: write to disk status: 0x%X\n", status);
 
 	return status;
 }
@@ -1428,16 +1433,21 @@ NTSTATUS dc_save_end_sectors(dev_hook *hook, void *buff)
 	NTSTATUS status;
 	u64 end_off = hook->dsk_size - hook->tail_len;
 
+	DbgMsg("dc_save_end_sectors: dsk_size=%I64u, tail_len=%u, end_off=%I64u, tail_off=%I64u\n",
+		hook->dsk_size, hook->tail_len, end_off, hook->tail_off);
+
 	/* Read from actual partition end via orig_dev (raw encrypted) */
 	if ( !NT_SUCCESS(status = io_device_request(hook->orig_dev, IRP_MJ_READ, buff, hook->tail_len, end_off)) ) {
+		DbgMsg("dc_save_end_sectors: read from disk failed: 0x%X\n", status);
 		return status;
 	}
 
 	/* Decrypt with partition end XTS tweak */
-	cp_fast_decrypt(buff, buff, hook->tail_len, end_off - hook->tail_len, hook->dsk_key);
+	cp_fast_decrypt(buff, buff, hook->tail_len, end_off, hook->dsk_key);
 
 	/* Write to storage via hook_dev (redirection + auto-encrypt with storage XTS) */
 	status = io_device_request(hook->hook_dev, IRP_MJ_WRITE, buff, hook->tail_len, end_off);
+	DbgMsg("dc_save_end_sectors: write to storage status: 0x%X\n", status);
 
 	return status;
 }
@@ -1460,7 +1470,31 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 	{
 		DbgMsg("dc_update_volume: device state changed during update, aborting\n");
 		status = STATUS_INVALID_DEVICE_STATE;
-		goto cleanup;
+		goto finish;
+	}
+
+	/* Cache backup header FIRST before any operations that modify partition end */
+	if (hook->flags & F_HEAD_BACKUP)
+	{
+		/* Allocate buffer for backup header
+		* Note: hook->head_len and hook->tail_len are almost always same, except during volume layout editing
+		* hence we always use hook->head_len, volume layout editing and partition resize should never be done at the same time.
+		*/
+
+		if ( (hdr_backup = mm_secure_alloc(max(hook->head_len, PAGE_SIZE))) == NULL )
+		{
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			goto finish;
+		}
+
+		DbgMsg("dc_update_volume: F_HEAD_BACKUP read backup header: off=%I64u, len=%u\n",
+			hook->dsk_size - hook->head_len, hook->head_len);
+
+		/* Cache backup header from partition end */
+		if ( !NT_SUCCESS(status = io_device_request(hook->orig_dev, IRP_MJ_READ, hdr_backup, hook->head_len, hook->dsk_size - hook->head_len)) ) {
+			DbgMsg("dc_update_volume: failed to read backup header error: 0x%X\n", status);
+			goto finish;
+		}
 	}
 
 	if (IS_STORAGE_ON_END(hook->flags))
@@ -1468,12 +1502,12 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 		if ( (pb_buff = mm_secure_alloc(max(hook->stor_len, PAGE_SIZE))) == NULL )
 		{
 			status = STATUS_INSUFFICIENT_RESOURCES;
-			goto cleanup;
+			goto finish;
 		}
 
 		if (!NT_SUCCESS(status = io_device_request(hook->hook_dev, IRP_MJ_READ, pb_buff, hook->stor_len, 0))) {
 			DbgMsg("dc_update_volume: failed to read storage error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 	}
 	else if (hook->flags & F_HEAD_BACKUP)
@@ -1489,7 +1523,7 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 		 * - Backup header at dsk_size - tail_len (replaces original end sector data)
 		 *
 		 * On resize:
-		 * 1. Cache backup header from partition end
+		 * 1. Cache backup header from partition end (done above)
 		 * 2. Restore original end sectors from storage to partition end
 		 * 3. Allow resize (dsk_size changes)
 		 * 4. Save new end sectors to storage
@@ -1502,34 +1536,23 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 		 * Actual partition end access requires orig_dev + manual encryption.
 		 */
 
-		if ( (pb_buff = mm_secure_alloc(max(hook->head_len, PAGE_SIZE))) == NULL )
+		if ( (pb_buff = mm_secure_alloc(max(hook->tail_len, PAGE_SIZE))) == NULL )
 		{
 			status = STATUS_INSUFFICIENT_RESOURCES;
-			goto cleanup;
-		}
-		if ( (hdr_backup = mm_secure_alloc(max(hook->tail_len, PAGE_SIZE))) == NULL )
-		{
-			status = STATUS_INSUFFICIENT_RESOURCES;
-			goto cleanup;
-		}
-
-		/* Cache backup header from partition end (direct access via orig_dev - raw encrypted header) */
-		if ( !NT_SUCCESS(status = io_device_request(hook->orig_dev, IRP_MJ_READ, hdr_backup, hook->tail_len, hook->dsk_size - hook->tail_len)) ) {
-			DbgMsg("dc_update_volume: failed to read backup header error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 
 		/* Restore original end sectors from storage to actual partition end */
 		if ( !NT_SUCCESS(status = dc_restore_end_sectors(hook, pb_buff)) ) {
 			DbgMsg("dc_update_volume: failed to restore end sectors error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 	}
 
-	if (new_len == 0)
+	if (new_len != 0)
 	{
-		/* Update size fields early to maintain internal consistency with stor_off.
-		* For shrink post-op, this may briefly differ from partition manager's view,
+		/* Shrink post-op: use the known new size from ShrinkPrepare.
+		* This may briefly differ from partition manager's view,
 		* but IOCTL_VOLUME_UPDATE_PROPERTIES will arrive shortly and validate/rectify. */
 		hook->dsk_size = new_len;
 	}
@@ -1538,11 +1561,11 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 		/* Expand or IOCTL path: query partition manager for new size */
 		if ( !NT_SUCCESS(status = io_device_control(hook->orig_dev, IOCTL_VOLUME_UPDATE_PROPERTIES, NULL, 0, NULL, 0)) ) {
 			DbgMsg("dc_update_volume: failed to update volume properties error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 		if ( !NT_SUCCESS(status = dc_fill_device_info(hook)))  {
 			DbgMsg("dc_update_volume: failed to get updated device info error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 		new_len = hook->dsk_size;
 	}
@@ -1550,7 +1573,7 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 	if (new_len == old_len) {
 		DbgMsg("dc_update_volume: size unchanged, nothing to do\n");
 		status = STATUS_SUCCESS;
-		goto cleanup;
+		goto finish;
 	}
 
 	DbgMsg("dc_update_volume: old_len: %I64u, new_len: %I64u\n", old_len, new_len);
@@ -1562,29 +1585,30 @@ NTSTATUS dc_update_volume(dev_hook *hook, ULONGLONG new_len)
 		hook->stor_off = new_len - hook->stor_len;
 		if ( !NT_SUCCESS(status = io_device_request(hook->hook_dev, IRP_MJ_WRITE, pb_buff, hook->stor_len, 0)) ) {
 			DbgMsg("dc_update_volume: failed to write storage error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 	}
 	else if ((hook->flags & F_HEAD_BACKUP) && hdr_backup != NULL)
 	{
-		DbgMsg("dc_update_volume: old tail_off: %I64u\n", hook->tail_off);
-		hook->tail_off = hook->stor_off + hook->stor_len - hook->tail_len;
-		DbgMsg("dc_update_volume: new tail_off: %I64u\n", hook->tail_off);
-
 		/* Save new end sectors from partition end to storage */
 		if ( !NT_SUCCESS(status = dc_save_end_sectors(hook, pb_buff)) ) {
 			DbgMsg("dc_update_volume: failed to save end sectors error: 0x%X\n", status);
-			goto cleanup;
-		}
-
-		/* Write backup header to new partition end (raw, not encrypted with volume key) */
-		if ( !NT_SUCCESS(status = io_device_request(hook->orig_dev, IRP_MJ_WRITE, hdr_backup, hook->tail_len, new_len - hook->tail_len)) ) {
-			DbgMsg("dc_update_volume: failed to write backup header error: 0x%X\n", status);
-			goto cleanup;
+			goto finish;
 		}
 	}
 
-cleanup:
+finish:
+	/* If backup header is also at partition end, write it to new location */
+	if (NT_SUCCESS(status) && (hook->flags & F_HEAD_BACKUP) && hdr_backup != NULL)
+	{
+		DbgMsg("dc_update_volume: IS_STORAGE_ON_END + F_HEAD_BACKUP write backup header: off=%I64u, len=%u\n",
+			new_len - hook->head_len, hook->head_len);
+
+		if ( !NT_SUCCESS(status = io_device_request(hook->orig_dev, IRP_MJ_WRITE, hdr_backup, hook->head_len, new_len - hook->head_len)) ) {
+			DbgMsg("dc_update_volume: failed to write backup header error: 0x%X\n", status);
+		}
+	}
+
 	if (pb_buff != NULL) mm_secure_free(pb_buff);
 	if (hdr_backup != NULL) mm_secure_free(hdr_backup);
 	KeReleaseMutex(&hook->busy_lock, FALSE);

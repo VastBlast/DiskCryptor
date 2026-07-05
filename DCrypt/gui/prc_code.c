@@ -567,8 +567,17 @@ _about_dlg_proc(
 				HWND h_title = GetDlgItem( hwnd, IDC_ABOUT1 );
 
 				_snwprintf(
-					s_display, countof(s_display), L"%s %s%S", DC_NAME, __config.load_flags & DST_PRO_ENABLED ? L"Pro " : L"", DC_PRODUCT_VER
+					s_display, countof(s_display), L"%s %s%S", DC_NAME, __config.load_flags & DST_PRO_ENABLED ? L"Pro " : L"", DC_FILE_VER
 					);
+
+#ifdef _DEBUG
+				int ver = dc_get_version( );
+				ldr_config conf = {0};
+				size_t len = wcslen(s_display);
+				_snwprintf(
+					s_display + len, countof(s_display) - len, dc_get_ldr_config( -1, &conf ) == ST_OK ? L"/%d.%d" : L"/%d", ver, (int)conf.ldr_ver
+				);
+#endif
 
 				SetWindowText( h_title, s_display );
 				SetWindowText( h_notice,

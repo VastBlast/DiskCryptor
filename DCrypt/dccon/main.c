@@ -1098,6 +1098,7 @@ int wmain(int argc, wchar_t *argv[])
 			resl = ST_OK; break;
 		}
 
+#ifndef _DEBUG
 		if (d_inited == 0)
 		{
 			if (vers > DC_DRIVER_VER) 
@@ -1118,6 +1119,7 @@ int wmain(int argc, wchar_t *argv[])
 
 			resl = ST_ERROR; break;
 		}
+#endif
 
 		/* initialize user mode RNG part */
 		if ( (resl = rnd_init()) != ST_OK ) {

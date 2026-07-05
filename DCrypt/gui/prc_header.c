@@ -2213,7 +2213,7 @@ static void _update_props_controls(HWND hwnd, keys_dlg_state* state)
 
     /* Storage size display (read-only) */
     size = is_v2 ? state->header->stor_len : DC_AREA_SIZE;
-    _format_hdr_size(size, buf, countof(buf), FALSE);
+    _format_hdr_size(size, buf, countof(buf), TRUE);
     SetDlgItemText(hwnd, IDC_EDIT_STORAGE_SIZE, buf);
 
     /* Storage location radio buttons */
@@ -2936,6 +2936,7 @@ static int _load_header_from_volume(HWND hwnd, keys_dlg_state *state, wchar_t *d
         if (state->header->flags & VF_BACKUP_HEADER)
         {
             int backup_bytes = DC_AREA_MAX_SIZE;
+            state->cached_backup_hdk_valid = FALSE;
 
             /* Get raw encrypted backup header from driver */
             resl = _wait_dc_backup_header(hwnd, device, &empty_pass, backup, &backup_bytes, HF_KEEP_SALT | HF_BACKUP_HEADER, L"Loading backup header...");
@@ -2952,22 +2953,23 @@ static int _load_header_from_volume(HWND hwnd, keys_dlg_state *state, wchar_t *d
                 }
 
                 /* Decrypt backup header in user-mode and cache derived key */
-                state->cached_backup_hdk_valid = FALSE;
                 resl = _wait_dc_decrypt_header(hwnd, backup_start, backup_len, password,
                     &state->backup_header, &state->backup_hdr_key, &state->backup_header_len, NULL,
                     state->cached_backup_hdk, L"Decrypting backup header...");
                 if (resl == ST_OK) {
                     state->cached_backup_hdk_valid = TRUE;
                 } else {
-                    /* Backup header failed to load - warn but continue with primary only */
                     state->backup_header = NULL;
                     state->backup_hdr_key = NULL;
                     state->backup_header_len = 0;
-                    resl = ST_OK; /* Don't fail the whole operation */
                 }
-            } else {
-                /* Backup header not found - warn but continue with primary only */
-                resl = ST_OK;
+            }
+
+            if (!state->cached_backup_hdk_valid) {
+                /* Backup header load failed - warn but continue with primary only */
+				__error_s(hwnd, L"The backup header could not be loaded from the volume. "
+                    L"The volume will be managed using the primary header only.\n", resl);
+                resl = ST_OK; /* Don't fail the whole operation */
             }
         }
 

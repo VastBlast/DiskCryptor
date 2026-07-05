@@ -2821,6 +2821,9 @@ int dc_update_layout(wchar_t *dev_name, dc_pass *password, crypt_info *crypt, u3
 
 			if (!IS_STORAGE_ON_END(hook->flags)) { // when using $dcsys% file grab real size (due to rounding may be already bigger)
 				dc_get_storage_size(hook, &stor_len);
+				if (stor_len > header->stor_len && !(flags & S_RESIZE_HEADER)) { // if we already have a bigger storage file, use that size, unless we are resizing header too
+					header->stor_len = stor_len;
+				}
 			} else {
 				stor_len = hook->stor_len;
 			}
