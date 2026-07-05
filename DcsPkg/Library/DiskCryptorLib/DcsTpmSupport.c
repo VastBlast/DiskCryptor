@@ -742,7 +742,7 @@ DcTpmSealToFile(
 	UINT8      sealedBuffer[2048];
 	UINT32     sealedSize = sizeof(sealedBuffer);
 
-	ret = gDcsTpm->SrkSealPassword(
+	ret = gDcsTpm->SrkSealSecret(
 		gDcsTpm,
 		Data, DataSize, DataType,
 		Options,
@@ -1023,7 +1023,7 @@ retry:
 	// Unseal recovery data
 	OUT_PRINT(L"Loading secret from recovery file... ");
 	backupSize = sizeof(backupBuffer);
-	ret = gDcsTpm->SrkUnsealPassword(
+	ret = gDcsTpm->SrkUnsealSecret(
 		gDcsTpm,
 		sealedBuffer, sealedSize,
 		backupBuffer, &backupSize, 
@@ -1187,9 +1187,9 @@ DcTpmLoadSrk(
 		return EFI_ACCESS_DENIED;
 	}
 
-retry:
-	// PIN retry loop
 	ZeroMem(tpmPin, sizeof(tpmPin));
+	// PIN retry loop
+retry:
 	// Prompt for PIN if required
 	if (pinRequired && pinToUse == NULL) {
 		AskConsolePwdEx("Enter TPM PIN: ", &pinLen, tpmPin, &pwdCode, DCS_TPM_OWNER_PWD_MAX - 1, FALSE, TRUE, HandleFuncKeysSimple, NULL, NULL);
@@ -1212,7 +1212,7 @@ retry:
 	// Unseal from buffer
 	OUT_PRINT(L"Loading secret from TPM (file mode)... ");
 	*DataSize = DataBufferSize;
-	ret = gDcsTpm->SrkUnsealPassword(
+	ret = gDcsTpm->SrkUnsealSecret(
 		gDcsTpm,
 		sealedBuffer, sealedSize,
 		Data, DataSize, DataType,
@@ -1224,12 +1224,11 @@ retry:
 		goto cleanup;
 	}
 
-	ERR_PRINT(L"Failed: %r\n", ret);
+	ERR_PRINT(L"Failed, error: %r\n", ret);
 
 	// Retry on wrong PIN
-	if (pinToUse != NULL && ret == EFI_ACCESS_DENIED) {
+	if (pinToUse != NULL /*&& ret == EFI_ACCESS_DENIED*/) {
 		OUT_PRINT(L"Check that TPM PIN is correct.\n");
-		ZeroMem(tpmPin, sizeof(tpmPin));
 		pinToUse = NULL;
 		goto retry;
 	}
@@ -1435,9 +1434,9 @@ DcTpmLoadNv(
 
 	pinRequired = (status & DCS_TPM_STATUS_PIN_REQUIRED) != 0;
 
-retry:
-	// PIN retry loop
 	ZeroMem(tpmPin, sizeof(tpmPin));
+	// PIN retry loop
+retry:
 	// Prompt for PIN if required
 	if (pinRequired && pinToUse == NULL) {
 		AskConsolePwdEx("Enter TPM PIN: ", &pinLen, tpmPin, &pwdCode, DCS_TPM_OWNER_PWD_MAX - 1, FALSE, TRUE, HandleFuncKeysSimple, NULL, NULL);
@@ -1463,12 +1462,11 @@ retry:
 		goto cleanup;
 	}
 
-	ERR_PRINT(L" Failed, error: %r\n", ret);
+	ERR_PRINT(L"Failed, error: %r\n", ret);
 
 	// Retry on wrong PIN
-	if (pinToUse != NULL && ret == EFI_ACCESS_DENIED) {
+	if (pinToUse != NULL /*&& ret == EFI_ACCESS_DENIED*/) {
 		OUT_PRINT(L"Check that TPM PIN is correct.\n");
-		ZeroMem(tpmPin, sizeof(tpmPin));
 		pinToUse = NULL;
 		goto retry;
 	}

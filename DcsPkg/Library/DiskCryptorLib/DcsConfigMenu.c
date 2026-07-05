@@ -132,7 +132,7 @@ static CFG_VALUE_NAME gHandoffModeValues[] = {
 };
 #endif
 
-// TPM PCR Mask display function - shows value as 0xHHH
+// TPM PCR Mask display function - shows value as 0xHHHH
 static VOID
 CfgDisplayPcrMask(
 	INT32   Value,
@@ -140,15 +140,16 @@ CfgDisplayPcrMask(
 	INT32   BufLen
 )
 {
-	if (Buffer == NULL || BufLen < 6)
+	if (Buffer == NULL || BufLen < 7)
 		return;
-	// Format as 0xHHH (3 hex digits)
+	// Format as 0xHHHH (4 hex digits)
 	Buffer[0] = L'0';
 	Buffer[1] = L'x';
-	Buffer[2] = L"0123456789ABCDEF"[(Value >> 8) & 0xF];
-	Buffer[3] = L"0123456789ABCDEF"[(Value >> 4) & 0xF];
-	Buffer[4] = L"0123456789ABCDEF"[Value & 0xF];
-	Buffer[5] = L'\0';
+	Buffer[2] = L"0123456789ABCDEF"[(Value >> 12) & 0xF];
+	Buffer[3] = L"0123456789ABCDEF"[(Value >> 8) & 0xF];
+	Buffer[4] = L"0123456789ABCDEF"[(Value >> 4) & 0xF];
+	Buffer[5] = L"0123456789ABCDEF"[Value & 0xF];
+	Buffer[6] = L'\0';
 }
 
 // TPM PCR Mask picker wrapper - calls DcTpmAskPcrMask

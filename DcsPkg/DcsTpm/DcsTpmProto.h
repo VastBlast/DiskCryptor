@@ -78,7 +78,7 @@ typedef struct _DCS_TPM_SEAL_OPTIONS {
 //
 // Default PCR mask: PCR 0 firmware, 2 drivers, 4 bootloader, 7 secure boot, 8 custom, 14 shim
 //
-#define DCS_TPM_DEFAULT_PCR_MASK  0x295
+#define DCS_TPM_DEFAULT_PCR_MASK  0x4195
 
 //
 // Flags
@@ -306,8 +306,8 @@ struct _EFI_DCS_TPM_PROTOCOL {
 
   // Buffer-based SRK API (caller handles file I/O)
   EFI_DCS_TPM_SRK_GET_STATUS        SrkGetStatus;
-  EFI_DCS_TPM_SRK_SEAL_PASSWORD     SrkSealPassword;
-  EFI_DCS_TPM_SRK_UNSEAL_PASSWORD   SrkUnsealPassword;
+  EFI_DCS_TPM_SRK_SEAL_PASSWORD     SrkSealSecret;
+  EFI_DCS_TPM_SRK_UNSEAL_PASSWORD   SrkUnsealSecret;
 };
 
 extern EFI_GUID gEfiDcsTpmProtocolGuid;

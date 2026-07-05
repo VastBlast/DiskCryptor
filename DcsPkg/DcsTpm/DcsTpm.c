@@ -113,7 +113,21 @@ DcsUnsealSecret (
 		return EFI_NOT_READY;
 	}
 
-	return gTpm->NvUnsealPassword(NvIndex, Data, DataSize, DataType, TpmPin);
+#ifdef _M_ARM64
+	/* On ARM64, the first attempt to unseal may fail due to a known issue with TPM PIN handling. 
+	   If the first attempt fails and a PIN is provided, retry once. */
+	static BOOLEAN first_atempt = TRUE;
+retry:
+	res = gTpm->NvUnsealPassword(NvIndex, Data, DataSize, DataType, TpmPin);
+	if (EFI_ERROR(res) && first_atempt && TpmPin) {
+		first_atempt = FALSE;
+		goto retry;
+	}
+#else
+	res = gTpm->NvUnsealPassword(NvIndex, Data, DataSize, DataType, TpmPin);
+#endif
+
+	return res;
 }
 
 /**
@@ -805,8 +819,21 @@ DcsSrkUnsealPassword (
     return EFI_UNSUPPORTED;
   }
 
-  return gTpm->SrkUnsealPassword(Buffer, BufferSize, Password, PasswordSize,
-                                  PasswordType, TpmPin);
+#ifdef _M_ARM64
+  /* On ARM64, the first attempt to unseal may fail due to a known issue with TPM PIN handling. 
+  If the first attempt fails and a PIN is provided, retry once. */
+  static BOOLEAN first_atempt = TRUE;
+retry:
+  res = gTpm->SrkUnsealPassword(Buffer, BufferSize, Password, PasswordSize, PasswordType, TpmPin);
+  if (EFI_ERROR(res) && first_atempt && TpmPin) {
+	  first_atempt = FALSE;
+	  goto retry;
+  }
+#else
+  res = gTpm->SrkUnsealPassword(Buffer, BufferSize, Password, PasswordSize, PasswordType, TpmPin);
+#endif
+
+  return res;
 }
 
 //////////////////////////////////////////////////////////////////////////
