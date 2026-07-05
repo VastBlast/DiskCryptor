@@ -1,6 +1,6 @@
 
 
-[??.07.2026] - 2.0.1/886.118.238
+[05.07.2026] - 2.0.1/886.118.238
   [*] Fixed Hwid detection issue in driver
   [*] Fixed BSOD on some ARM64 devices caused by driver
   [*] Fixed DCS issues with some ARM64 Qualcomm laptops
