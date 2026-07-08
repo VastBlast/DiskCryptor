@@ -172,6 +172,16 @@ BltText(
 	IN CONST VOID *text,
 	IN BOOLEAN wide);
 
+VOID
+BltTextMono(
+	IN BLT_HEADER* blt,
+	IN PDRAW_CONTEXT draw,
+	IN INT32 x,
+	IN INT32 y,
+	IN INT32 scale, // 0..256 reduce 256... enlarge
+	IN CONST VOID *text,
+	IN BOOLEAN wide);
+
 
 EFI_STATUS
 BmpGetSize(

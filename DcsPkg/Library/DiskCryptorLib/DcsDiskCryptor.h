@@ -107,8 +107,40 @@ DcTpmAskPcrMask(
 VOID
 DCAuthLoadConfig();
 
+//////////////////////////////////////////////////////////////////////////
+// CLI Helpers (DcsCliHelpers.c)
+//////////////////////////////////////////////////////////////////////////
+
+VOID
+DcsAskConsolePwd(
+    IN  CONST CHAR8 *Msg,
+    OUT UINT32      *Length,
+    OUT VOID        *Buffer,
+    OUT INT32       *RetCode,
+    IN  UINTN       MaxLen,
+    IN  UINT8       ShowPassword,
+    IN  BOOLEAN     Wide,
+    IN  INT32       (*KeyFilter)(IN EFI_INPUT_KEY Key, IN VOID *Param),
+    IN  VOID        (*GetStatus)(IN CHAR16 *StatusStr, IN UINTN StatusStrLen, IN VOID *Param),
+    IN  VOID        *Param
+    );
+
 BOOLEAN
-AskYesNo(CHAR16 *Prompt, BOOLEAN DefaultYes);
+DcsAskYesNo(CHAR16 *Prompt, BOOLEAN DefaultYes);
+
+VOID
+DcsAskPassword(
+    IN  CONST CHAR8 *Msg,
+    OUT UINT32      *Length,
+    OUT VOID        *Buffer,
+    OUT INT32       *RetCode,
+    IN  UINTN       MaxLen,
+    IN  UINT8       ShowPassword,
+    IN  BOOLEAN     Wide,
+    IN  INT32       (*KeyFilter)(IN EFI_INPUT_KEY Key, IN VOID *Param),
+    IN  VOID        (*GetStatus)(IN CHAR16 *StatusStr, IN UINTN StatusStrLen, IN VOID *Param),
+    IN  VOID        *Param
+    );
 
 EFI_STATUS DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int key_file, int hw_key, UINT8* data, UINT32 data_size);
 

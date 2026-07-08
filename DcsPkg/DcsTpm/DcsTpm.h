@@ -128,14 +128,30 @@ DcsGetInfo (
 
 EFI_STATUS
 EFIAPI
-DcsShowPcrs (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+DcsReadPcr (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                PcrIndex,
+  OUT UINT8                 *PcrValue,
+  OUT UINT32                *PcrSize
   );
 
 EFI_STATUS
 EFIAPI
-DcsShowNvIndices (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+DcsEnumNvIndices (
+  IN     EFI_DCS_TPM_PROTOCOL  *This,
+  OUT    UINT32                *IndexList,
+  IN OUT UINT32                *IndexCount
+  );
+
+EFI_STATUS
+EFIAPI
+DcsGetNvIndexInfo (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                NvIndex,
+  OUT UINT32                *Attributes,
+  OUT UINT32                *DataSize,
+  OUT UINT32                *PcrRead OPTIONAL,
+  OUT UINT32                *PcrWrite OPTIONAL
   );
 
 EFI_STATUS

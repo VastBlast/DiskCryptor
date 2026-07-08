@@ -564,6 +564,18 @@ AttrPrintEx(
 	...
 	);
 
+/**
+  VA_LIST version of AttrPrintEx for forwarding variadic arguments.
+**/
+EFI_STATUS
+EFIAPI
+VAttrPrintEx(
+	IN INT32                Col OPTIONAL,
+	IN INT32                Row OPTIONAL,
+	IN CONST CHAR16         *Format,
+	IN VA_LIST              Marker
+	);
+
 //////////////////////////////////////////////////////////////////////////
 // Console control
 //////////////////////////////////////////////////////////////////////////
@@ -573,6 +585,9 @@ extern UINTN       gConsoleControlCount;
 
 EFI_STATUS
 InitConsoleControl();
+
+EFI_STATUS
+RestoreConsoleControl();
 
 //////////////////////////////////////////////////////////////////////////
 // Beep

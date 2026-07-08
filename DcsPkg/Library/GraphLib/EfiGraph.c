@@ -93,6 +93,9 @@ EFI_STATUS ScreenDrawBlt(
 	IN UINTN   y
 	)
 {
+	if (gGraphOut == NULL || blt == NULL) {
+		return EFI_INVALID_PARAMETER;
+	}
 	return gGraphOut->Blt(gGraphOut, blt->Pixels, EfiBltBufferToVideo, 0, 0, x, y, blt->Width, blt->Height, blt->Width * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
 }
 
@@ -101,10 +104,13 @@ EFI_STATUS ScreenUpdateDirty(
 	)
 {
 	EFI_STATUS	res = EFI_SUCCESS;
+	if (gGraphOut == NULL || bltScreen == NULL) {
+		return EFI_INVALID_PARAMETER;
+	}
 	if (bltScreen->Dirty.top != bltScreen->Dirty.bottom || bltScreen->Dirty.left != bltScreen->Dirty.right) {
-		res = gGraphOut->Blt(gGraphOut, bltScreen->Pixels, EfiBltBufferToVideo, 
-			bltScreen->Dirty.top, bltScreen->Dirty.left, // Source x,y 
-			bltScreen->Dirty.top, bltScreen->Dirty.left, // Dest x,y
+		res = gGraphOut->Blt(gGraphOut, bltScreen->Pixels, EfiBltBufferToVideo,
+			bltScreen->Dirty.left, bltScreen->Dirty.top, // Source x,y (left=X, top=Y)
+			bltScreen->Dirty.left, bltScreen->Dirty.top, // Dest x,y
 			bltScreen->Dirty.right - bltScreen->Dirty.left + 1, bltScreen->Dirty.bottom - bltScreen->Dirty.top + 1,		// width , height
 			bltScreen->Width * sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
 		SetMem(&bltScreen->Dirty, sizeof(bltScreen->Dirty), 0);
@@ -410,6 +416,54 @@ BltText(
 				fromY = toY;
 			}
 			posX += (spacing * scale) >> 8;
+		}
+		// Next line
+		if (ch == '\n') {
+			posX = x;
+			posY += 30 * scale >> 8;
+		}
+	}
+}
+
+// Monospace version - fixed character width for console output
+// Width of 24 units at scale 96 gives ~9 pixels, matching typical console char width
+#define MONO_CHAR_WIDTH 24
+VOID
+BltTextMono(
+	IN BLT_HEADER* blt,
+	IN PDRAW_CONTEXT draw,
+	IN INT32 x,
+	IN INT32 y,
+	IN INT32 scale, // 0..256 reduce 256... enlarge
+	IN CONST VOID *text,
+	IN BOOLEAN wide)
+{
+	INT32	posX = x;
+	INT32 posY = y;
+	const char *c;
+	for (c = text; *c; c += (wide ? 2 : 1))
+	{
+		INT8 ch = *c;
+		if (ch >= 32 && ch <= 126) {
+			INT8 *it = (INT8*)gSimplex_ascii_32_126[ch - 32];
+			INT32 nvtcs = *it++;
+			it++; // Skip variable spacing, we use fixed width
+			INT32	fromX = -1;
+			INT32 fromY = -1;
+			INTN i;
+			for (i = 0; i < nvtcs; ++i) {
+				INT32 toX = *it++;
+				INT32 toY = *it++;
+				if ((fromX != -1 || fromY != -1) && (toX != -1 || toY != -1)) {
+					BltLine(
+						blt, draw,
+						posX + ((fromX * scale) >> 8), posY + (((25 - fromY) * scale) >> 8),
+						posX + ((toX * scale) >> 8), posY + (((25 - toY) * scale) >> 8));
+				}
+				fromX = toX;
+				fromY = toY;
+			}
+			posX += (MONO_CHAR_WIDTH * scale) >> 8;
 		}
 		// Next line
 		if (ch == '\n') {

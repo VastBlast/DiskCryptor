@@ -483,3 +483,29 @@ AttrPrintEx(
   VA_END(Marker);
   return(RetVal);
 }
+
+/**
+  VA_LIST version of AttrPrintEx for forwarding variadic arguments.
+
+  @param[in] Col        the column to print at (-1 for current)
+  @param[in] Row        the row to print at (-1 for current)
+  @param[in] Format     the format string
+  @param[in] Marker     the VA_LIST of arguments
+
+  @return EFI_SUCCESS           The printing was successful.
+  @return EFI_DEVICE_ERROR      The console device reported an error.
+**/
+EFI_STATUS
+EFIAPI
+VAttrPrintEx(
+  IN INT32                Col OPTIONAL,
+  IN INT32                Row OPTIONAL,
+  IN CONST CHAR16         *Format,
+  IN VA_LIST              Marker
+  )
+{
+  if (Format == NULL) {
+    return (EFI_INVALID_PARAMETER);
+  }
+  return InternalAttrPrintWorker(Col, Row, Format, Marker);
+}

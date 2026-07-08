@@ -26,6 +26,8 @@ https://opensource.org/licenses/LGPL-3.0
 #include <Library/GraphLib.h>
 #include <Library/DcsCfgLib.h>
 #include <Library/DcsIntLib.h>
+#include <Library/ConsoleLib.h>
+#include <Library/PasswordLib.h>
 #include <DcsConfig.h>
 
 #include "../DcsTpm/DcsTpmProto.h"
@@ -215,7 +217,7 @@ EFI_STATUS PrepareBootDataBlock(BOOLEAN full)
 	}
 
 	if (gConfigDebug) {
-		OUT_PRINT(L"DEBUG: bdb address 0x%p, size %d\n", addr, len);
+		g_Con->Print(L"DEBUG: bdb address 0x%p, size %d\n", addr, len);
 	}
 	
 	// set memory region to be zeroed by the driver
@@ -325,7 +327,7 @@ int dc_direct_io(mount_inf *mount, void *buff, u16 sectors, u64 start, int read)
 	EFI_BLOCK_IO_PROTOCOL *BlockIo;
 
 	if (mount == NULL || mount->BlockIo == NULL) {
-		ERR_PRINT(L"\nhdd_io: mount or BlockIo is NULL\n");
+		g_Con->PrintError(L"\nhdd_io: mount or BlockIo is NULL\n");
 		return 0;
 	}
 
@@ -677,13 +679,13 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		// Skip already mounted partitions
 		if (GetPartitionMount(partPath) != NULL) {
 			if (gConfigDebug) {
-				OUT_PRINT(L"Skipping volume %d:%d (already mounted)\n", diskNum, part.PartitionNumber);
+				g_Con->Print(L"Skipping volume %d:%d (already mounted)\n", diskNum, part.PartitionNumber);
 			}
 			continue;
 		}
 
 		if (partBlockIo->Media->BlockSize > MAX_SECTOR_SIZE) {
-			ERR_PRINT(L"Partition has unsupported block size %d\n", partBlockIo->Media->BlockSize);
+			g_Con->PrintError(L"Partition has unsupported block size %d\n", partBlockIo->Media->BlockSize);
 			continue;
 		}
 
@@ -692,7 +694,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		// MBR partitions or partitions not found in GPT are always allowed.
 		if (diskBlockIo != NULL && !IsTargetPartitionType(diskBlockIo, part.PartitionStart)) {
 			if (gConfigDebug) {
-				OUT_PRINT(L"Skipping volume %d:%d (non-target partition type)\n", diskNum, part.PartitionNumber);
+				g_Con->Print(L"Skipping volume %d:%d (non-target partition type)\n", diskNum, part.PartitionNumber);
 			}
 			continue;
 		}
@@ -707,7 +709,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 			}
 			header = (dc_header*)MEM_ALLOC(hdr_len);
 			if (header == NULL) {
-				ERR_PRINT(L"Not enough memory to allocate header buffer\n");
+				g_Con->PrintError(L"Not enough memory to allocate header buffer\n");
 				continue;
 			}
 			header_size = hdr_len;
@@ -716,7 +718,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		// Read header from partition start (LBA 0 of partition)
 		ret = partBlockIo->ReadBlocks(partBlockIo, partBlockIo->Media->MediaId, 0, hdr_len, header);
 		if (EFI_ERROR(ret)) {
-			ERR_PRINT(L"Can't read partition, status %r\n", ret);
+			g_Con->PrintError(L"Can't read partition, status %r\n", ret);
 			continue;
 		}
 
@@ -724,13 +726,13 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		// These are not encrypted and attempting decryption on them wastes time.
 		if (GetFilesystemInfo((UINT8*)header, NULL)) {
 			if (gConfigDebug) {
-				OUT_PRINT(L"Skipping volume %d:%d (known filesystem)\n", diskNum, part.PartitionNumber);
+				g_Con->Print(L"Skipping volume %d:%d (known filesystem)\n", diskNum, part.PartitionNumber);
 			}
 			continue;
 		}
 
 		if (gConfigDebug) {
-			OUT_PRINT(L"Mounting volume %d:%d ... ", diskNum, part.PartitionNumber);
+			g_Con->Print(L"Mounting volume %d:%d ... ", diskNum, part.PartitionNumber);
 		}
 
 		UINT64 StartTick = ReadTimestamp();
@@ -741,7 +743,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		if (decrypt_result == 0)
 		{
 			if (gConfigDebug) {
-				ERR_PRINT(L"Fail (%llu ms)\n", ElapsedMs);
+				g_Con->PrintError(L"Fail (%llu ms)\n", ElapsedMs);
 			}
 
 			continue;
@@ -751,7 +753,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		if ((iodb.n_mount >= MOUNT_MAX) ||
 			(iodb.n_key >= MOUNT_MAX - ((header->flags & VF_REENCRYPT) ? 1 : 0)))
 		{
-			ERR_PRINT(L"Not enough memory to mount all partitions\n");
+			g_Con->PrintError(L"Not enough memory to mount all partitions\n");
 			continue;
 		}
 		mount = &iodb.p_mount[iodb.n_mount];
@@ -806,7 +808,7 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 		iodb.n_mount++;
 
 		if (gConfigDebug) {
-			OUT_PRINT(L"%VSuccess%N (%llu ms) [%s%s%d/%d, %uKB%s%s]",
+			g_Con->Print(L"%VSuccess%N (%llu ms) [%s%s%d/%d, %uKB%s%s]",
 				ElapsedMs,
 				mount->version >= DC_HDR_VERSION_2 ? L"v2" : L"v1",
 				(mount->features & FF_KEY_SLOTS) ? L"+" : L"-",
@@ -817,25 +819,25 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 				(mount->flags & VF_STORAGE_FILE) ? L"" : L"@");
 			// Read and decrypt first sector to detect filesystem type
 			if (dc_mount_io(mount, header, 1, 0, 1) && (fsType = GetFilesystemInfo((UINT8*)header, fsSerial))) {
-				OUT_PRINT(L" (FS: %s)\n", fsType);
+				g_Con->Print(L" (FS: %s)\n", fsType);
 			} else {
-				ERR_PRINT(L" (FS: unknown)\n");
+				g_Con->PrintError(L" (FS: unknown)\n");
 			}
 		}
 	}
 
 	if (/*!*vol_found &&*/ hdr_found && !IsPxeBoot())
 	{
-		//OUT_PRINT(L"enum my root\n");
+		//g_Con->Print(L"enum my root\n");
 
 		EFI_FILE* root;
 		ret = FileOpenRoot(gFileRootHandle, &root);
-		if (EFI_ERROR(ret)) { ERR_PRINT(L"FileOpenRoot %r\n", ret); }
+		if (EFI_ERROR(ret)) { g_Con->PrintError(L"FileOpenRoot %r\n", ret); }
 		else
 		{
 			EFI_FILE* dir;
 			ret = root->Open(root, &dir, L"EFI\\" DCS_DIRECTORY, EFI_FILE_READ_ONLY, 0);
-			if (EFI_ERROR(ret)) { ERR_PRINT(L"root->Open %r\n", ret); }
+			if (EFI_ERROR(ret)) { g_Con->PrintError(L"root->Open %r\n", ret); }
 			else
 			{
 				EFI_FILE_INFO* DirInfo;
@@ -860,18 +862,18 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 
 					EFI_FILE* file;
 					ret = dir->Open(dir, &file, DirInfo->FileName, EFI_FILE_MODE_READ, 0);
-					if (EFI_ERROR(ret)) { ERR_PRINT(L"dir->Open %r\n", ret); }
+					if (EFI_ERROR(ret)) { g_Con->PrintError(L"dir->Open %r\n", ret); }
 					else
 					{
-						OUT_PRINT(L"Trying to decrypt test header for: %s ... ", &DirInfo->FileName[11]);
+						g_Con->Print(L"Trying to decrypt test header for: %s ... ", &DirInfo->FileName[11]);
 
 						UINTN fileSize = DC_AREA_SIZE;
 						ret = file->Read(file, &fileSize, header);
-						if (EFI_ERROR(ret)) { ERR_PRINT(L"file->read %r\n", ret); }
+						if (EFI_ERROR(ret)) { g_Con->PrintError(L"file->read %r\n", ret); }
 						else
 						{
 							if (fileSize < DC_AREA_SIZE) {
-								ERR_PRINT(L"is to small %d\n", &DirInfo->FileName[11], fileSize);
+								g_Con->PrintError(L"is to small %d\n", &DirInfo->FileName[11], fileSize);
 							}
 							else {
 								UINT64 HdrStartTick = ReadTimestamp();
@@ -880,11 +882,11 @@ DcTryDecrypt(int* vol_found, int* hdr_found)
 								UINT64 HdrElapsedMs = GetElapsedMs(HdrStartTick, HdrEndTick);
 
 								if (hdr_decrypt_result == 0) {
-									ERR_PRINT(L"Fail (%llu ms)\n", HdrElapsedMs);
+									g_Con->PrintError(L"Fail (%llu ms)\n", HdrElapsedMs);
 								}
 								else {
 									(*hdr_found)++;
-									OUT_PRINT(L"%VSuccess%N (%llu ms)\n", HdrElapsedMs);
+									g_Con->Print(L"%VSuccess%N (%llu ms)\n", HdrElapsedMs);
 								}
 							}
 						}
@@ -953,11 +955,11 @@ MountDisks(
 		if (mount != NULL) {
 			// Decrypted partition - install crypto hook
 			if (gConfigDebug) {
-				OUT_PRINT(L"Hooking volume %d:%d (decrypted)\n", diskNum, partInfo.PartitionNumber);
+				g_Con->Print(L"Hooking volume %d:%d (decrypted)\n", diskNum, partInfo.PartitionNumber);
 			}
 			ret = AddCryptoMount(partPath, DCVolumeIO_Read, DCVolumeIO_Write, mount);
 			if (EFI_ERROR(ret)) {
-				ERR_PRINT(L"Failed to hook volume %d:%d: %r\n", diskNum, partInfo.PartitionNumber, ret);
+				g_Con->PrintError(L"Failed to hook volume %d:%d: %r\n", diskNum, partInfo.PartitionNumber, ret);
 			} else {
 				mountedCount++;
 			}
@@ -966,17 +968,17 @@ MountDisks(
 			// Unencrypted partition - block it (except boot ESP)
 			if (IsBootEsp(gBIOHandles[i])) {
 				if (gConfigDebug) {
-					OUT_PRINT(L"Skipping boot ESP (volume %d:%d)\n", diskNum, partInfo.PartitionNumber);
+					g_Con->Print(L"Skipping boot ESP (volume %d:%d)\n", diskNum, partInfo.PartitionNumber);
 				}
 				continue;
 			}
 
 			if (gConfigDebug) {
-				OUT_PRINT(L"Blocking volume %d:%d\n", diskNum, partInfo.PartitionNumber);
+				g_Con->Print(L"Blocking volume %d:%d\n", diskNum, partInfo.PartitionNumber);
 			}
 			ret = AddCryptoMount(partPath, DCVolumeIO_Read, DCVolumeIO_Write, NULL);
 			if (EFI_ERROR(ret)) {
-				ERR_PRINT(L"Failed to block volume %d:%d: %r\n", diskNum, partInfo.PartitionNumber, ret);
+				g_Con->PrintError(L"Failed to block volume %d:%d: %r\n", diskNum, partInfo.PartitionNumber, ret);
 			} else {
 				blockedCount++;
 			}
@@ -985,10 +987,10 @@ MountDisks(
 
 	if (gConfigDebug) {
 		if (mountedCount > 0) {
-			OUT_PRINT(L"Hooked %d decrypted volume(s)\n", mountedCount);
+			g_Con->Print(L"Hooked %d decrypted volume(s)\n", mountedCount);
 		}
 		if (blockedCount > 0) {
-			OUT_PRINT(L"Blocked %d unencrypted volume(s)\n", blockedCount);
+			g_Con->Print(L"Blocked %d unencrypted volume(s)\n", blockedCount);
 		}
 	}
 
@@ -1045,7 +1047,7 @@ FindBootEspOnBootDisk(
 	res = EfiGetPartGUID(gFileRootHandle, &bootEspGuid);
 	if (EFI_ERROR(res)) {
 		if (gConfigDebug) {
-			ERR_PRINT(L"Cannot get boot ESP GUID: %r\n", res);
+			g_Con->PrintError(L"Cannot get boot ESP GUID: %r\n", res);
 		}
 		return res;
 	}
@@ -1053,7 +1055,7 @@ FindBootEspOnBootDisk(
 	res = EfiGetPartDetails(gFileRootHandle, &partInfo, &diskHandle);
 	if (EFI_ERROR(res)) {
 		if (gConfigDebug) {
-			ERR_PRINT(L"Cannot get boot disk: %r\n", res);
+			g_Con->PrintError(L"Cannot get boot disk: %r\n", res);
 		}
 		return res;
 	}
@@ -1260,7 +1262,7 @@ SelectBootPartition()
 		ret = EfiFindPartByGUID(&guid, &h);
 		if (!EFI_ERROR(ret)) {
 			if (gConfigDebug) {
-				OUT_PRINT(L"Boot partition (configured): %g\n", &guid);
+				g_Con->Print(L"Boot partition (configured): %g\n", &guid);
 			}
 			EfiSetVar(L"DcsExecPartGuid", NULL, &guid, sizeof(EFI_GUID), EFI_VARIABLE_BOOTSERVICE_ACCESS);
 			return EFI_SUCCESS;
@@ -1273,18 +1275,18 @@ SelectBootPartition()
 	case LDR_BT_AP_PASSWORD:ret = FindBootEspForPasswordMode(0, &guid); break;
 	case LDR_BT_DISK_ID:	ret = FindBootEspForPasswordMode(gDCryptBootDiskID, &guid); break;
 	default:
-		ERR_PRINT(L"Unsupported boot mode: %d\n", gDCryptBootMode);
+		g_Con->PrintError(L"Unsupported boot mode: %d\n", gDCryptBootMode);
 		ret = EFI_UNSUPPORTED;
 		break;
 	}
 
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to select boot partition: %r\n", ret);
+		g_Con->PrintError(L"Failed to select boot partition: %r\n", ret);
 		return ret;
 	}
 
 	if (gConfigDebug) {
-		OUT_PRINT(L"Selected boot partition: %g\n", &guid);
+		g_Con->Print(L"Selected boot partition: %g\n", &guid);
 	}
 
 	EfiSetVar(L"DcsExecPartGuid", NULL, &guid, sizeof(EFI_GUID), EFI_VARIABLE_BOOTSERVICE_ACCESS);
@@ -1304,10 +1306,6 @@ DcsDiskCryptor(
 	int vol_found = 0;
 	int hdr_found = 0;
 
-	if (gConfigDebug) {
-		OUT_PRINT(L"DiskCryptor UEFI bootloader version: %d.%02d\n", ver.ldr_ver / 100, ver.ldr_ver % 100);
-	}
-
 	// Load Certificate from Loader or directly from disk
 	if (DcsLdrGetCertState(&gVerifyCertInfo.State) == EFI_NOT_READY) {
 		VerifyInit();
@@ -1318,6 +1316,13 @@ DcsDiskCryptor(
 
 	// Load auth parameters
 	DCAuthLoadConfig();
+
+	// Initialize console abstraction layer (must be after gDCryptTouchInput is set)
+	ConsoleInit();
+
+	if (gConfigDebug) {
+		g_Con->Print(L"DiskCryptor UEFI bootloader version: %d.%02d\n", ver.ldr_ver / 100, ver.ldr_ver % 100);
+	}
 
 	if (!EFI_ERROR(InitDcsTpm()) && gDcsTpm != NULL) {
 
@@ -1341,13 +1346,14 @@ DcsDiskCryptor(
 	// init crypto
 	gDCryptHwCrypto = xts_init(gDCryptHwCrypto);
 	if (gConfigDebug && gDCryptHwCrypto != 0) {
-		ERR_PRINT(L"Using Hardware Crypt, Type %d\n", gDCryptHwCrypto);
+		g_Con->PrintError(L"Using Hardware Crypt, Type %d\n", gDCryptHwCrypto);
 	}
 
 	// Verify block I/O handles are available (initialized by InitBio)
 	if (gBIOCount == 0) {
-		ERR_PRINT(L"No block I/O devices found\n");
-		return EFI_NOT_FOUND;
+		g_Con->PrintError(L"No block I/O devices found\n");
+		ret = EFI_NOT_FOUND;
+		goto finish;
 	}
 
 	if (gConfigDebug) {
@@ -1358,7 +1364,7 @@ DcsDiskCryptor(
 			else
 				diskCount++;
 		}
-		OUT_PRINT(L"DEBUG: found %d disks and %d partitions\n", diskCount, partCount);
+		g_Con->Print(L"DEBUG: found %d disks and %d partitions\n", diskCount, partCount);
 	}
 
 	// prepare memory for boot data
@@ -1367,8 +1373,8 @@ DcsDiskCryptor(
 		ret = PrepareBootDataBlock(FALSE);
 	}
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to allocate required memory range for boot params: %r\n", ret);
-		return ret;
+		g_Con->PrintError(L"Failed to allocate required memory range for boot params: %r\n", ret);
+		goto finish;
 	}
 
 	// prompt for password and try decrypt partitions
@@ -1382,12 +1388,12 @@ DcsDiskCryptor(
 		UINT32  lock = 1;
 		ret2 = gDcsTpm->UpdatePcr8(gDcsTpm, sizeof(lock), &lock);
 		if (EFI_ERROR(ret2)) {
-			ERR_PRINT(L"Warning: Could not lock TPM, error: %r\n", ret2);
+			g_Con->PrintError(L"Warning: Could not lock TPM, error: %r\n", ret2);
 		}
 	}
 
 	if (EFI_ERROR(ret)) {
-		return ret; // returning error will trigger clearence of sensitive data
+		goto finish;
 	}
 
 	if (hdr_found > 0)
@@ -1396,8 +1402,8 @@ DcsDiskCryptor(
 	// set boot data values
 	ret = SetBootDataBlock();
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Cannot set boot params for driver: %r\n", ret);
-		return ret;
+		g_Con->PrintError(L"Cannot set boot params for driver: %r\n", ret);
+		goto finish;
 	}
 
 	// after setting up the BDB we dont need the passwords anymore
@@ -1405,28 +1411,30 @@ DcsDiskCryptor(
 	MEM_BURN(gDCryptPassCache, sizeof(gDCryptPassCache));
 
 	if (gConfigDebug) {
-		OUT_PRINT(L"Volumes Mounted: %d, Headers Approved: %d\n", vol_found, hdr_found);
+		g_Con->Print(L"Volumes Mounted: %d, Headers Approved: %d\n", vol_found, hdr_found);
 	}
 
 	// Install hooks
 	ret = MountDisks(ImageHandle, SystemTable);
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"MountDisks %r\n", ret);
-		return ret;
+		g_Con->PrintError(L"MountDisks %r\n", ret);
+		goto finish;
 	}
 
 	if (gDCryptBootMode == 6) { // boot menu
-		return EFI_DCS_INPUT_REQUIRED; 
+		ret = EFI_DCS_INPUT_REQUIRED; 
+		goto finish;
 	}
 
 	// Select boot partition
 	ret = SelectBootPartition();
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"SelectBootPartition failed %r\n", ret);
-		return ret;
+		g_Con->PrintError(L"SelectBootPartition failed %r\n", ret);
 	}
 
-	return EFI_SUCCESS;
+finish:
+	ConsoleShutdown();
+	return ret;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1565,26 +1573,26 @@ SelectUsbKeyFile(
 
 	for (;;) {
 		// Clear screen and draw header
-		gST->ConOut->ClearScreen(gST->ConOut);
-		OUT_PRINT(L"=== Select USB Key File ===\n\n");
-		OUT_PRINT(L"Multiple USB drives with KeyFile.bin found.\n");
-		OUT_PRINT(L"Please select which one to use:\n\n");
+		g_Con->Clear();
+		g_Con->Print(L"=== Select USB Key File ===\n\n");
+		g_Con->Print(L"Multiple USB drives with KeyFile.bin found.\n");
+		g_Con->Print(L"Please select which one to use:\n\n");
 
 		// Draw entries
 		for (i = 0; i < Count; i++) {
 			if ((INTN)i == selected) {
-				OUT_PRINT(L"%H> %s%N\n", Entries[i].VolumeLabel);
+				g_Con->Print(L"%H> %s%N\n", Entries[i].VolumeLabel);
 			} else {
-				OUT_PRINT(L"  %s\n", Entries[i].VolumeLabel);
+				g_Con->Print(L"  %s\n", Entries[i].VolumeLabel);
 			}
 		}
 
 		// Draw navigation hints
-		OUT_PRINT(L"\n[Up/Down] Navigate  [Enter] Select  [Esc] Cancel\n");
+		g_Con->Print(L"\n[Up/Down] Navigate  [Enter] Select  [Esc] Cancel\n");
 
 		// Get input
-		key = GetKey();
-		FlushInputDelay(50000);
+		key = g_Con->GetKey();
+		g_Con->FlushInput(50000);
 
 		if (key.ScanCode == SCAN_ESC) {
 			return EFI_ABORTED;
@@ -1632,7 +1640,7 @@ LoadUsbKeyFile(
 	// Find all USB drives with KeyFile.bin
 	ret = FindUsbKeyFiles(&entries, &count);
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"No USB drive with KeyFile.bin found\n");
+		g_Con->PrintError(L"No USB drive with KeyFile.bin found\n");
 		return ret;
 	}
 
@@ -1644,13 +1652,13 @@ LoadUsbKeyFile(
 			return ret;
 		}
 		// Clear screen after picker
-		gST->ConOut->ClearScreen(gST->ConOut);
+		g_Con->Clear();
 	}
 
 	// Open root of selected drive
 	ret = FileOpenRoot(entries[selectedIndex].Handle, &root);
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to open USB drive: %r\n", ret);
+		g_Con->PrintError(L"Failed to open USB drive: %r\n", ret);
 		MEM_FREE(entries);
 		return ret;
 	}
@@ -1660,9 +1668,9 @@ LoadUsbKeyFile(
 	FileClose(root);
 
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to load KeyFile.bin from USB: %r\n", ret);
+		g_Con->PrintError(L"Failed to load KeyFile.bin from USB: %r\n", ret);
 	} else if (gConfigDebug) {
-		OUT_PRINT(L"DEBUG: Loaded KeyFile.bin from USB: %s, size: %d\n",
+		g_Con->Print(L"DEBUG: Loaded KeyFile.bin from USB: %s, size: %d\n",
 			entries[selectedIndex].VolumeLabel, *FileSize);
 	}
 
@@ -1699,7 +1707,7 @@ LoadFilePickerKeyFile(
 	// Re-enumerate file system handles to detect USB drives plugged in after boot
 	ret = EfiGetHandles(ByProtocol, &gEfiSimpleFileSystemProtocolGuid, 0, &fsHandles, &fsCount);
 	if (EFI_ERROR(ret) || fsCount == 0) {
-		ERR_PRINT(L"No file systems found\n");
+		g_Con->PrintError(L"No file systems found\n");
 		return EFI_NOT_FOUND;
 	}
 
@@ -1732,7 +1740,7 @@ LoadFilePickerKeyFile(
 
 	if (usbCount == 0) {
 		MEM_FREE(usbVolumes);
-		ERR_PRINT(L"No USB drives found\n");
+		g_Con->PrintError(L"No USB drives found\n");
 		return EFI_NOT_FOUND;
 	}
 
@@ -1756,18 +1764,18 @@ LoadFilePickerKeyFile(
 
 	if (EFI_ERROR(ret)) {
 		if (ret == EFI_DCS_USER_CANCELED) {
-			gST->ConOut->ClearScreen(gST->ConOut);
+			g_Con->Clear();
 		}
 		return ret;
 	}
 
 	// Clear screen after picker
-	gST->ConOut->ClearScreen(gST->ConOut);
+	g_Con->Clear();
 
 	// Load the selected file
 	ret = FileOpenRoot(selectedHandle, &root);
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to open USB drive: %r\n", ret);
+		g_Con->PrintError(L"Failed to open USB drive: %r\n", ret);
 		MEM_FREE(selectedPath);
 		return ret;
 	}
@@ -1776,9 +1784,9 @@ LoadFilePickerKeyFile(
 	FileClose(root);
 
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to load key file: %r\n", ret);
+		g_Con->PrintError(L"Failed to load key file: %r\n", ret);
 	} else if (gConfigDebug) {
-		OUT_PRINT(L"DEBUG: Loaded key file: %s, size: %d\n", selectedPath, *FileSize);
+		g_Con->Print(L"DEBUG: Loaded key file: %s, size: %d\n", selectedPath, *FileSize);
 	}
 
 	MEM_FREE(selectedPath);
@@ -1845,6 +1853,7 @@ VOID DCAuthLoadConfig()
 
 	// Picture Password - new
 	gDCryptTouchInput = ConfigReadInt("TouchInput", 0);
+
 	//gPasswordPictureFileName = ConfigReadStringW("PasswordPicture", L"\\EFI\\" DCS_DIRECTORY L"\\login.bmp", NULL, MAX_MSG); // h1630 v1090
 	//gPasswordPictureChars = ConfigReadString("PictureChars", gPasswordPictureCharsDefault, NULL, MAX_MSG);
 	//gPasswordPictureCharsLen = AsciiStrnLenS(gPasswordPictureChars, MAX_MSG);
@@ -1903,7 +1912,7 @@ DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int ke
 	UINTN  keyfile_size = 0;
 
 	if (gConfigDebug) {
-		OUT_PRINT(L"DEBUG: Finallizing password, size: %d, key file: %d, hw key: %d\n", password_size, key_file, hw_key);
+		g_Con->Print(L"DEBUG: Finallizing password, size: %d, key file: %d, hw key: %d\n", password_size, key_file, hw_key);
 	}
 
 	if (password_size > MAX_PASSWORD * sizeof(CHAR16)) {
@@ -1911,13 +1920,13 @@ DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int ke
 	}
 
 	if (hw_key == DCryptTPM && !gDCryptTpmSecretValid) {
-		ERR_PRINT(L"TPM secret is not valid\n");
+		g_Con->PrintError(L"TPM secret is not valid\n");
 		return EFI_ACCESS_DENIED;
 	}
 
 	if (key_file == DCryptEmbedded) {
 		if(!gDCryptKeyFilePath || !*gDCryptKeyFilePath) {
-			ERR_PRINT(L"Embedded key file path is not configured\n");
+			g_Con->PrintError(L"Embedded key file path is not configured\n");
 			ret = EFI_NOT_FOUND;
 		}
 		else if (IsPxeBoot()) {
@@ -1928,7 +1937,7 @@ DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int ke
 	}
 	else if (key_file == DCryptPlatform) {
 		if (gPlatformKeyFileSize == 0) {
-			ERR_PRINT(L"Platform key file is not available\n");
+			g_Con->PrintError(L"Platform key file is not available\n");
 			ret = EFI_NOT_FOUND;
 		}
 		else {
@@ -1944,7 +1953,7 @@ DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int ke
 	}
 
 	if (EFI_ERROR(ret)) {
-		ERR_PRINT(L"Failed to load key file: %r\n", ret);
+		g_Con->PrintError(L"Failed to load key file: %r\n", ret);
 		return ret;
 	}
 
@@ -2021,7 +2030,7 @@ DCFinalizePassword(dc_pass* pass, CHAR16* password, UINT32 password_size, int ke
 		if (!EFI_ERROR(ret)) ret = dc_kf_mixer_finish(&mixer, pass);
 		else dc_kf_mixer_free(&mixer);
 
-		//ERR_PRINT(L"Result: \n");
+		//g_Con->PrintError(L"Result: \n");
 		//DumpHex(pass->pass, pass->size);
 	}
 
@@ -2039,56 +2048,12 @@ finish:
 	{
 		UINT8 c = sectorData[idx];
 		if (c > 0x1f && c < 0x7f)
-			OUT_PRINT(L"%c", c);
+			g_Con->Print(L"%c", c);
 		else
-			OUT_PRINT(L"_");
+			g_Con->Print(L"_");
 	}
-	OUT_PRINT(L"\n");
+	g_Con->Print(L"\n");
 }*/
-
-/**
-Ask user a yes/no question and wait for valid input.
-
-@param[in] Prompt       The prompt to display (should include [y/N] or [Y/n] hint)
-@param[in] DefaultYes   If TRUE, Enter defaults to Yes; if FALSE, Enter defaults to No
-
-@return TRUE if user answered Yes, FALSE if No or cancelled (ESC)
-**/
-BOOLEAN AskYesNo(CHAR16 *Prompt, BOOLEAN DefaultYes) {
-  EFI_INPUT_KEY key;
-
-  OUT_PRINT(L"%s", Prompt);
-
-  for (;;) {
-    key = GetKey();
-
-    // Yes
-    if (key.UnicodeChar == L'y' || key.UnicodeChar == L'Y') {
-      OUT_PRINT(L"y\n");
-      return TRUE;
-    }
-
-    // No
-    if (key.UnicodeChar == L'n' || key.UnicodeChar == L'N') {
-      OUT_PRINT(L"n\n");
-      return FALSE;
-    }
-
-    // Enter - use default
-    if (key.UnicodeChar == CHAR_CARRIAGE_RETURN) {
-      OUT_PRINT(L"%c\n", DefaultYes ? L'y' : L'n');
-      return DefaultYes;
-    }
-
-    // ESC - cancel (same as No)
-    if (key.ScanCode == SCAN_ESC) {
-      OUT_PRINT(L"\n");
-      return FALSE;
-    }
-
-    // Invalid key - ignore and wait for valid input
-  }
-}
 
 // Convert a string to a tag value
 // Accepts either:
@@ -2211,13 +2176,13 @@ BOOLEAN AskYesNo(CHAR16 *Prompt, BOOLEAN DefaultYes) {
 //
 //	DcTagToString(DefaultTag ? DefaultTag : tag, defaultTag, sizeof(defaultTag)/sizeof(CHAR16));
 //
-//	OUT_PRINT(L"Enter cache tag (1-4 chars or 0xHHHHHHHH) [%s]: ", defaultTag);
+//	g_Con->Print(L"Enter cache tag (1-4 chars or 0xHHHHHHHH) [%s]: ", defaultTag);
 //
 //	// Simple inline input for tag
 //	tagLen = 0;
 //	ZeroMem(tagBuf, sizeof(tagBuf));
 //
-//	if(!GetLine(&tagLen, tagBuf, NULL, 11, TRUE))
+//	if(!g_Con->ReadLine(&tagLen, tagBuf, NULL, 11, TRUE))
 //		return 0; // cancelled
 //
 //	// If empty, use default
@@ -2228,7 +2193,7 @@ BOOLEAN AskYesNo(CHAR16 *Prompt, BOOLEAN DefaultYes) {
 //	// Convert to tag value
 //	tag = DcStringToTag(tagBuf, tagLen);
 //	if (tag == 0) {
-//		ERR_PRINT(L"Invalid tag. Use 1-4 ASCII chars or hex (0x...).\n");
+//		g_Con->PrintError(L"Invalid tag. Use 1-4 ASCII chars or hex (0x...).\n");
 //		return 0;
 //	}
 //
@@ -2245,9 +2210,9 @@ DcAskLabel(char* outTag) // max 20 0 padded
 
 	ZeroMem(outTag, SLOT_LABEL_LEN);
 
-	OUT_PRINT(L"Enter cache label [%s]: ", defaultTag);
+	g_Con->Print(L"Enter cache label [%s]: ", defaultTag);
 
-	if(!GetLine(&len, tagBuf, NULL, sizeof(tagBuf) / sizeof(CHAR16), TRUE))
+	if(!g_Con->ReadLine(&len, tagBuf, NULL, sizeof(tagBuf) / sizeof(CHAR16), TRUE))
 		return 0; // cancelled
 
 	// If empty, use default
@@ -2391,7 +2356,7 @@ DcMain(int* vol_found, int* hdr_found)
 	DcsLdrGetMokSBState(&sbState);
 
 	PlatformGetID(NULL, &gPlatformKeyFile, &gPlatformKeyFileSize);
-	//OUT_PRINT(L"Platform ID: %a\n", gPlatformKeyFile);
+	//g_Con->Print(L"Platform ID: %a\n", gPlatformKeyFile);
 
 	gDCryptPwdCode = AskPwdRetCancel;
 	gDCryptTpmPinUsed = FALSE;
@@ -2410,8 +2375,8 @@ DcMain(int* vol_found, int* hdr_found)
 		else if (!EFI_ERROR(ret)) {
 
 			if (!gDCryptTpmPinUsed && !gBlockUnencryptedVolumes && !sbState) {
-				OUT_PRINT(L"\n%OWARNING:%N %HSecure Boot is disabled%N without it unattended TPM unlock is unsafe.\n");
-				OUT_PRINT(L"Please considder using a TPM PIN or enabling Secure Boot for better security.\n\n");
+				g_Con->Print(L"\n%OWARNING:%N %HSecure Boot is disabled%N without it unattended TPM unlock is unsafe.\n");
+				g_Con->Print(L"Please considder using a TPM PIN or enabling Secure Boot for better security.\n\n");
 				gDCryptAutoLoginDelay = 15;
 			}
 
@@ -2420,26 +2385,26 @@ DcMain(int* vol_found, int* hdr_found)
 	}
 
 	if (gDCryptTpmSecretValid && !gVerifyCertInfo.s.active) {
-		OUT_PRINT(L"\n");
-		OUT_PRINT(L"  %O+======================================================================+%N\n");
-		OUT_PRINT(L"  %O|%N                                                                      %O|%N\n");
-		OUT_PRINT(L"  %O|%N   %ESUPPORT CERTIFICATE REQUIRED%N                                       %O|%N\n");
-		OUT_PRINT(L"  %O|%N                                                                      %O|%N\n");
-		OUT_PRINT(L"  %O|%N   DiskCryptor Pro TPM Module requires a valid Support Certificate.   %O|%N\n");
-		OUT_PRINT(L"  %O|%N                                                                      %O|%N\n");
-		OUT_PRINT(L"  %O|%N   Please visit the web shop at %Hdiskcryptor.org%N to obtain one.        %O|%N\n");
-		OUT_PRINT(L"  %O|%N                                                                      %O|%N\n");
-		OUT_PRINT(L"  %O+======================================================================+%N\n");
-		OUT_PRINT(L"\n");
+		g_Con->Print(L"\n");
+		g_Con->Print(L"  %O+======================================================================+%N\n");
+		g_Con->Print(L"  %O|%N                                                                      %O|%N\n");
+		g_Con->Print(L"  %O|%N   %ESUPPORT CERTIFICATE REQUIRED%N                                       %O|%N\n");
+		g_Con->Print(L"  %O|%N                                                                      %O|%N\n");
+		g_Con->Print(L"  %O|%N   DiskCryptor Pro TPM Module requires a valid Support Certificate.   %O|%N\n");
+		g_Con->Print(L"  %O|%N                                                                      %O|%N\n");
+		g_Con->Print(L"  %O|%N   Please visit the web shop at %Hdiskcryptor.org%N to obtain one.        %O|%N\n");
+		g_Con->Print(L"  %O|%N                                                                      %O|%N\n");
+		g_Con->Print(L"  %O+======================================================================+%N\n");
+		g_Con->Print(L"\n");
 		if (!gDcsLdr) {
-			key = KeyWait(L"  Please wait %2d seconds...\r", 60, 0, 0);
+			key = g_Con->KeyWait(L"  Please wait %2d seconds...\r", 60, 0, 0);
 			if (key.ScanCode != 0 || key.UnicodeChar != 0) {
-				OUT_PRINT(L"  Cancelled.                    \n");
+				g_Con->Print(L"  Cancelled.                    \n");
 				gDCryptTpmSecretValid = FALSE;
 				ret = EFI_ABORTED;
 			}
 		}
-		OUT_PRINT(L"\n");
+		g_Con->Print(L"\n");
 	}
 	
 	// Auto-login: if enabled and not already loaded from TPM, use configured password (and key file if configured)
@@ -2460,9 +2425,9 @@ DcMain(int* vol_found, int* hdr_found)
 	{
 		// Only show countdown for truly unattended mode (no PIN, no password interaction)
 		if (!gDCryptTpmPinUsed) {
-			key = KeyWait(L"Auto mount in %2d\r", gDCryptAutoLoginDelay ? gDCryptAutoLoginDelay : 1, 0, 0);
+			key = g_Con->KeyWait(L"Auto mount in %2d\r", gDCryptAutoLoginDelay ? gDCryptAutoLoginDelay : 1, 0, 0);
 			if ((key.UnicodeChar != CHAR_CARRIAGE_RETURN) && (key.ScanCode != 0 || key.UnicodeChar != 0)) {
-				OUT_PRINT(L"Cancelled.               \n");
+				g_Con->Print(L"Cancelled.               \n");
 				ret = EFI_ABORTED;
 			}
 		}
@@ -2471,12 +2436,12 @@ DcMain(int* vol_found, int* hdr_found)
 			if (gConfigDebug) {
 				CONST CHAR16* keyFileName = (Params.KeyFile >= 0 && Params.KeyFile < ARRAY_SIZE(gKeyFileNames)) ? gKeyFileNames[Params.KeyFile] : L"Unknown";
 				CONST CHAR16* hwKeyName = (Params.HwKey >= 0 && Params.HwKey < ARRAY_SIZE(gHwKeyNames)) ? gHwKeyNames[Params.HwKey] : L"Unknown";
-				OUT_PRINT(L"Auto Mount:%s KeyFile: %s; HW-Key: %s\n", password_size> 0 ? L" Preset Password;" : L"", keyFileName, hwKeyName);
+				g_Con->Print(L"Auto Mount:%s KeyFile: %s; HW-Key: %s\n", password_size> 0 ? L" Preset Password;" : L"", keyFileName, hwKeyName);
 			}
 
 			ret = DCFinalizePassword(&gDCryptPassword, password, password_size, Params.KeyFile, Params.HwKey, NULL, 0);
 			if (EFI_ERROR(ret)) {
-				ERR_PRINT(L"Failed to finalize password, error: %r\n", ret);
+				g_Con->PrintError(L"Failed to finalize password, error: %r\n", ret);
 			}
 		}
 
@@ -2487,19 +2452,19 @@ DcMain(int* vol_found, int* hdr_found)
 		if (!EFI_ERROR(ret)) 
 		{
 			if (!gConfigDebug) {
-				OUT_PRINT(L"Mounting volumes...");
+				g_Con->Print(L"Mounting volumes...");
 			}
 			DcTryDecrypt(vol_found, NULL);
 
 			if (*vol_found > 0) {
 				if (!gConfigDebug) {
-					OUT_PRINT(L"%VSuccess!%N\n");
+					g_Con->Print(L"%VSuccess!%N\n");
 				}
 				ret = EFI_SUCCESS;
 				goto finish;
 			}
 			if (!gConfigDebug) {
-				ERR_PRINT(L"Failed!\n");
+				g_Con->PrintError(L"Failed!\n");
 			}
 		}
 	}
@@ -2510,15 +2475,8 @@ DcMain(int* vol_found, int* hdr_found)
 	MEM_BURN(&gDCryptPassword, sizeof(gDCryptPassword));
 
 	do {
-		// password prompt
-		if (gDCryptTouchInput == 1 && gGraphOut != NULL && ((gTouchPointer != NULL) || (gTouchSimulate != 0))) {
-			//AskPictPwdInt(AskPwdLogin, MAX_PASSWORD, gDCryptPassword.pass, &gDCryptPassword.size, &gDCryptPwdCode, TRUE);
-			//AskTouchPwdInt(AskPwdLogin, MAX_PASSWORD, password, &password_size, &gDCryptPwdCode, TRUE);
-			AskTouchPwdEx(gDCryptPasswordMsg, &password_size, password, &gDCryptPwdCode, MAX_PASSWORD, gPasswordVisible, TRUE, HandleFuncKeys, FormatStatus, &Params);
-		} else {
-			//AskConsolePwdInt(gDCryptPasswordMsg, &password_size, password, &gDCryptPwdCode, MAX_PASSWORD, gPasswordVisible, TRUE);
-			AskConsolePwdEx(gDCryptPasswordMsg, &password_size, password, &gDCryptPwdCode, MAX_PASSWORD, gPasswordVisible, TRUE, HandleFuncKeys, FormatStatus, &Params);
-		}
+		// password prompt - uses g_Con abstraction to select touch or console mode
+		DcsAskPassword(gDCryptPasswordMsg, &password_size, password, &gDCryptPwdCode, MAX_PASSWORD, gPasswordVisible, TRUE, HandleFuncKeys, FormatStatus, &Params);
 
 		//if (gDCryptPwdCode == AskPwdRetChange) {
 		//	gDcsTpm->MenuShow(gDcsTpm);  
@@ -2561,7 +2519,7 @@ DcMain(int* vol_found, int* hdr_found)
 		if (ret == EFI_DCS_USER_CANCELED) {
 			continue;
 		} else if (EFI_ERROR(ret)){
-			ERR_PRINT(L"Failed finalize Password: %r\n", ret);
+			g_Con->PrintError(L"Failed finalize Password: %r\n", ret);
 			continue;
 		}
 		gDCryptPassword.kdf = gDCryptHeaderKdf;
@@ -2569,38 +2527,38 @@ DcMain(int* vol_found, int* hdr_found)
 
 		if (gDCryptPwdCode == AskPwdCachePass) {
 			if (gDCryptPassCount >= DC_PASS_CACHE_SIZE) {
-				ERR_PRINT(L"Password cache is full. Cannot cache more passwords.\n");
+				g_Con->PrintError(L"Password cache is full. Cannot cache more passwords.\n");
 			}
 			else if (gDCryptHandoffMode != 3) {
 				if (DcAskLabel(gDCryptPassword.label)) {
 					gDCryptPassCache[gDCryptPassCount++] = gDCryptPassword;
-					OUT_PRINT(L"Password Cached\n");
+					g_Con->Print(L"Password Cached\n");
 				}
 			}
 			ZeroMem(gDCryptPassword.label, sizeof(gDCryptPassword.label));
 			password_size = 0;
 
 			// try to mount volumes with this password
-			OUT_PRINT(L"%a\n", gDCryptStartMsg);
+			g_Con->Print(L"%a\n", gDCryptStartMsg);
 			int mount_before = iodb.n_mount;
 			DcTryDecrypt(vol_found, hdr_found);
 			if (iodb.n_mount > mount_before) {
-				OUT_PRINT(L"%a\n", gDCryptSuccessMsg);
+				g_Con->Print(L"%a\n", gDCryptSuccessMsg);
 			}
 			continue;
 		}
 
-		OUT_PRINT(L"%a\n", gDCryptStartMsg);
+		g_Con->Print(L"%a\n", gDCryptStartMsg);
 
 		DcTryDecrypt(vol_found, hdr_found);
 
 		if (*vol_found > 0 || *hdr_found > 0) {
-			OUT_PRINT(L"%a\n", gDCryptSuccessMsg);
+			g_Con->Print(L"%a\n", gDCryptSuccessMsg);
 			ret = EFI_SUCCESS;
 			goto finish;
 		}
 		else {
-			ERR_PRINT(L"%a\n", gDCryptErrorMsg);
+			g_Con->PrintError(L"%a\n", gDCryptErrorMsg);
 			// clear previous failed authentication information
 			//MEM_BURN(&gDCryptPassword, sizeof(gDCryptPassword)); // leave it for next try, maybe user just made a typo and wants to try again without re-entering the password
 

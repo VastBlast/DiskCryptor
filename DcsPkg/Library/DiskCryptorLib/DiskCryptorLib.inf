@@ -64,6 +64,7 @@
   Argon2/blake2/blamka-round-opt.h
 
 [Sources.common]
+  DcsCliHelpers.c
   DcsConfigMenu.c
   DcsTpmSupport.c
   DcsDiskCryptor.c
@@ -126,6 +127,7 @@
   BaseCryptLib
   DebugLib
   SynchronizationLib
+  ConsoleLib
 
 [Guids]
   gEfiPartTypeUnusedGuid

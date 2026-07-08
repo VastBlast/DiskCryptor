@@ -343,273 +343,125 @@ DcsGetInfo (
 }
 
 /**
-  Show PCR values used by sealed secret.
+  Read a single PCR value from the TPM.
 
-  @param[in] This  A pointer to the EFI_DCS_TPM_PROTOCOL instance.
+  @param[in]  This      A pointer to the EFI_DCS_TPM_PROTOCOL instance.
+  @param[in]  PcrIndex  PCR index (0-23).
+  @param[out] PcrValue  Buffer for PCR value (must be at least 64 bytes).
+  @param[out] PcrSize   Receives actual PCR size.
 
-  @retval EFI_SUCCESS     PCRs displayed successfully.
-  @retval EFI_NOT_READY   TPM not available.
+  @retval EFI_SUCCESS           PCR read successfully.
+  @retval EFI_NOT_READY         TPM not available.
+  @retval EFI_INVALID_PARAMETER Invalid parameters.
 
 **/
 EFI_STATUS
 EFIAPI
-DcsShowPcrs (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+DcsReadPcr (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                PcrIndex,
+  OUT UINT8                 *PcrValue,
+  OUT UINT32                *PcrSize
   )
 {
 	EFI_STATUS res;
-	UINT32     pcrMask = 0;
-	UINTN      i;
-	UINT8      pcrValue[64];  // Max PCR size (SHA-512)
-	UINT32     pcrSize;
+
+	if (PcrValue == NULL || PcrSize == NULL) {
+		return EFI_INVALID_PARAMETER;
+	}
 
 	res = GetTpm();
 	if (EFI_ERROR(res) || gTpm == NULL) {
 		return EFI_NOT_READY;
 	}
 
-	gST->ConOut->ClearScreen(gST->ConOut);
-	OUT_PRINT(L"--- PCR Values ---\n\n");
-
-	// Try to get PCR mask and show relevant PCRs
-	if (!EFI_ERROR(gTpm->NvGetInfo(0, &pcrMask, NULL, NULL, NULL))) {
-		OUT_PRINT(L"PCRs used by sealed secret (mask 0x%03x):\n\n", pcrMask);
-	} else {
-		OUT_PRINT(L"PCRs 0-15 (no secret configured):\n\n");
+	if (gTpm->ReadPcr == NULL) {
+		return EFI_UNSUPPORTED;
 	}
 
-	for (i = 0; i <= 15; ++i) {
-		OUT_PRINT((pcrMask & (1 << i)) ? L"%HPCR%02d%N " : L"PCR%02d ", i);
-		res = gTpm->ReadPcr((UINT32)i, pcrValue, &pcrSize);
-		if (EFI_ERROR(res)) {
-			ERR_PRINT(L"Error: %r\n", res);
-		} else {
-			UefiPrintBytes(pcrValue, pcrSize);
-			OUT_PRINT(L"\n");
-		}
-	}
-
-	OUT_PRINT(L"\nPress any key to continue...\n");
-	UefiGetKey();
-	return EFI_SUCCESS;
-}
-
-// NV Index entry for display
-typedef struct {
-	UINT32     Index;
-	UINT32     DataSize;
-	UINT32     Attributes;
-	UINT32     PcrRead;
-	UINT32     PcrWrite;
-	BOOLEAN    HasInfo;
-	EFI_STATUS InfoError;
-	CHAR16     *Label;
-} NV_INDEX_ENTRY;
-
-STATIC
-VOID
-DcTpmPrintNvEntry(
-	IN NV_INDEX_ENTRY *Entry,
-	IN BOOLEAN        IsTpm20
-)
-{
-	OUT_PRINT(L"  0x%08x", Entry->Index);
-
-	if (Entry->HasInfo) {
-		OUT_PRINT(L"  Size: %4d  ", Entry->DataSize);
-
-		UINT32 attrs = Entry->Attributes;
-		OUT_PRINT(L"Attr: ");
-		// Written
-		OUT_PRINT((attrs & 0x00020000) ? L"W" : L"-");
-		// Write access
-		if (attrs & 0x00000004) OUT_PRINT(L"A");       // AUTHWRITE
-		else if (attrs & 0x00000002) OUT_PRINT(L"O");  // OWNERWRITE
-		else if (attrs & 0x00000001) OUT_PRINT(L"P");  // PPWRITE
-		else if (attrs & 0x00000040) OUT_PRINT(L"Y");  // POLICYWRITE
-		else OUT_PRINT(L"-");
-		// Read access
-		if (attrs & 0x00040000) OUT_PRINT(L"a");       // AUTHREAD
-		else if (attrs & 0x00000100) OUT_PRINT(L"o");  // OWNERREAD
-		else if (attrs & 0x00010000) OUT_PRINT(L"p");  // PPREAD
-		else if (attrs & 0x00080000) OUT_PRINT(L"y");  // POLICYREAD
-		else OUT_PRINT(L"-");
-		// Lock
-		OUT_PRINT((attrs & 0x02000000) ? L"L" : L"-");
-
-		if (IsTpm20) {
-			// TPM 2.0
-		} else {
-			// TPM 1.2
-			if (Entry->PcrRead != 0) OUT_PRINT(L" PCR-R:0x%03x ", Entry->PcrRead);
-			if (Entry->PcrWrite != 0) OUT_PRINT(L" PCR-W:0x%03x", Entry->PcrWrite);
-		}
-	} else {
-		OUT_PRINT(L"  (error: %r)", Entry->InfoError);
-	}
-
-	if (Entry->Label != NULL) {
-		OUT_PRINT(L"  %V%s%N", Entry->Label);
-	}
-	OUT_PRINT(L"\n");
-}
-
-STATIC
-CHAR16*
-DcTpmGetNvIndexLabel(
-	IN UINT32 NvIndex
-)
-{
-	UINT32 baseIndex = NvIndex & 0x00FFFFFF;
-
-	// Known DCS/VeraCrypt/DiskCryptor indices
-	if ((baseIndex & 0xFFFF0) == 0x0DC50 && (baseIndex & DC_TPM_NV_PCRS_BIT) == 0) return L"DCS Entry";
-	if ((baseIndex & 0xFFFF0) == 0x0DC50 && (baseIndex & DC_TPM_NV_PCRS_BIT) != 0) return L"DCS Entry (Info)";
-
-	// TCG defined indices (PC Client spec)
-	if (NvIndex == 0x01C00002) return L"TCG Boot Service";
-	if (NvIndex == 0x01C00003) return L"TCG Owner Policy";
-	if (NvIndex == 0x01C00004) return L"TCG Auth Policy";
-	if (NvIndex == 0x01C10102) return L"Windows BitLocker";
-	if (NvIndex == 0x01C10103) return L"Windows BitLocker (alt)";
-	if (NvIndex == 0x01C10104) return L"Windows Resume Key";
-
-	// Platform indices
-	if ((NvIndex & 0xFF000000) == 0x01000000) return L"Owner Defined";
-	if ((NvIndex & 0xFF000000) == 0x01400000) return L"Platform Defined";
-	if ((NvIndex & 0xFF000000) == 0x01800000) return L"Endorsement Defined";
-	if ((NvIndex & 0xFF000000) == 0x01C00000) return L"TCG Defined";
-
-	return NULL;
+	return gTpm->ReadPcr(PcrIndex, PcrValue, PcrSize);
 }
 
 /**
-  Show NV indices list.
+  Enumerate NV indices.
 
-  @param[in] This  A pointer to the EFI_DCS_TPM_PROTOCOL instance.
+  @param[in]     This       A pointer to the EFI_DCS_TPM_PROTOCOL instance.
+  @param[out]    IndexList  Array to receive NV indices.
+  @param[in,out] IndexCount In = array size, Out = actual count.
 
-  @retval EFI_SUCCESS     NV indices displayed successfully.
-  @retval EFI_NOT_READY   TPM not available.
+  @retval EFI_SUCCESS           Indices enumerated successfully.
+  @retval EFI_NOT_READY         TPM not available.
+  @retval EFI_BUFFER_TOO_SMALL  IndexList too small.
 
 **/
 EFI_STATUS
 EFIAPI
-DcsShowNvIndices (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+DcsEnumNvIndices (
+  IN     EFI_DCS_TPM_PROTOCOL  *This,
+  OUT    UINT32                *IndexList,
+  IN OUT UINT32                *IndexCount
   )
 {
-	EFI_STATUS      res;
-	UINT32          rawIndices[128];
-	NV_INDEX_ENTRY  entries[128];
-	UINT32          rawCount = 128;
-	UINT32          validCount = 0;
-	UINT32          i;
-	BOOLEAN         isTpm20;
-	UINTN           screenRows = 25;
-	UINTN           screenCols = 80;
-	UINT32          entriesPerPage;
-	UINT32          currentPage = 0;
-	UINT32          totalPages;
-	EFI_INPUT_KEY   key;
+	EFI_STATUS res;
+
+	if (IndexList == NULL || IndexCount == NULL) {
+		return EFI_INVALID_PARAMETER;
+	}
 
 	res = GetTpm();
 	if (EFI_ERROR(res) || gTpm == NULL) {
 		return EFI_NOT_READY;
 	}
 
-	// Get console size
-	if (gST->ConOut->Mode != NULL) {
-		gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode, &screenCols, &screenRows);
-	}
-	// Reserve lines for header (3) + footer (4) + margin (1)
-	entriesPerPage = (UINT32)(screenRows > 10 ? screenRows - 8 : 10);
-
-	isTpm20 = (gTpm->TpmVersion >= 0x200);
-
-	// Enumerate and gather NV index info
-	res = gTpm->EnumNvIndices(rawIndices, &rawCount);
-	if (EFI_ERROR(res)) {
-		gST->ConOut->ClearScreen(gST->ConOut);
-		ERR_PRINT(L"Failed to enumerate NV indices: %r\n", res);
-		OUT_PRINT(L"\nPress any key to continue...\n");
-		UefiGetKey();
-		return res;
+	if (gTpm->EnumNvIndices == NULL) {
+		return EFI_UNSUPPORTED;
 	}
 
-	for (i = 0; i < rawCount && validCount < 128; i++) {
-		if (rawIndices[i] == 0) continue;
+	return gTpm->EnumNvIndices(IndexList, IndexCount);
+}
 
-		entries[validCount].Index = rawIndices[i];
-		entries[validCount].Label = DcTpmGetNvIndexLabel(rawIndices[i]);
-		entries[validCount].PcrRead = 0;
-		entries[validCount].PcrWrite = 0;
+/**
+  Get NV index information.
 
-		res = gTpm->GetNvIndexInfo(rawIndices[i],
-			&entries[validCount].Attributes,
-			&entries[validCount].DataSize,
-			&entries[validCount].PcrRead,
-			&entries[validCount].PcrWrite);
-		entries[validCount].HasInfo = !EFI_ERROR(res);
-		entries[validCount].InfoError = res;
-		validCount++;
+  @param[in]  This       A pointer to the EFI_DCS_TPM_PROTOCOL instance.
+  @param[in]  NvIndex    NV index to query.
+  @param[out] Attributes Receives NV attributes.
+  @param[out] DataSize   Receives data size.
+  @param[out] PcrRead    Receives PCR read mask (TPM 1.2 only, optional).
+  @param[out] PcrWrite   Receives PCR write mask (TPM 1.2 only, optional).
+
+  @retval EFI_SUCCESS           Info retrieved successfully.
+  @retval EFI_NOT_READY         TPM not available.
+  @retval EFI_NOT_FOUND         Index not found.
+
+**/
+EFI_STATUS
+EFIAPI
+DcsGetNvIndexInfo (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                NvIndex,
+  OUT UINT32                *Attributes,
+  OUT UINT32                *DataSize,
+  OUT UINT32                *PcrRead OPTIONAL,
+  OUT UINT32                *PcrWrite OPTIONAL
+  )
+{
+	EFI_STATUS res;
+
+	if (Attributes == NULL || DataSize == NULL) {
+		return EFI_INVALID_PARAMETER;
 	}
 
-	if (validCount == 0) {
-		gST->ConOut->ClearScreen(gST->ConOut);
-		OUT_PRINT(L"--- TPM NV Indices ---\n\n");
-		OUT_PRINT(L"No NV indices defined.\n");
-		OUT_PRINT(L"\nPress any key to continue...\n");
-		UefiGetKey();
-		return EFI_SUCCESS;
+	res = GetTpm();
+	if (EFI_ERROR(res) || gTpm == NULL) {
+		return EFI_NOT_READY;
 	}
 
-	// Calculate total pages
-	totalPages = (validCount + entriesPerPage - 1) / entriesPerPage;
-
-	// Display loop with pagination
-	while (TRUE) {
-		UINT32 startIdx = currentPage * entriesPerPage;
-		UINT32 endIdx = startIdx + entriesPerPage;
-		if (endIdx > validCount) endIdx = validCount;
-
-		gST->ConOut->ClearScreen(gST->ConOut);
-		OUT_PRINT(L"--- TPM NV Indices (%d total) ---\n\n", validCount);
-
-		// Print entries for current page
-		for (i = startIdx; i < endIdx; i++) {
-			DcTpmPrintNvEntry(&entries[i], isTpm20);
-		}
-
-		// Footer
-		OUT_PRINT(L"\n");
-		if (isTpm20) {
-			OUT_PRINT(L"Attr: W=Written O/o=Owner A/a=Auth P/p=PP Y/y=Policy L=Locked\n");
-		}
-		OUT_PRINT(L"Page %d/%d  ", currentPage + 1, totalPages);
-		if (totalPages > 1) {
-			OUT_PRINT(L"[PgUp/PgDn] Navigate  ");
-		}
-		OUT_PRINT(L"[Esc/x/e] Back\n");
-
-		key = UefiGetKey();
-
-		if (key.ScanCode == SCAN_PAGE_UP || key.ScanCode == SCAN_UP) {
-			if (currentPage > 0) currentPage--;
-		} else if (key.ScanCode == SCAN_PAGE_DOWN || key.ScanCode == SCAN_DOWN) {
-			if (currentPage < totalPages - 1) currentPage++;
-		} else if (key.ScanCode == SCAN_HOME) {
-			currentPage = 0;
-		} else if (key.ScanCode == SCAN_END) {
-			currentPage = totalPages - 1;
-		} else if (key.ScanCode == SCAN_ESC ||
-			key.UnicodeChar == L'x' || key.UnicodeChar == L'X' ||
-			key.UnicodeChar == L'e' || key.UnicodeChar == L'E' ||
-			key.UnicodeChar == L'q' || key.UnicodeChar == L'Q') {
-			break;
-		}
+	if (gTpm->GetNvIndexInfo == NULL) {
+		return EFI_UNSUPPORTED;
 	}
 
-	return EFI_SUCCESS;
+	return gTpm->GetNvIndexInfo(NvIndex, Attributes, DataSize, PcrRead, PcrWrite);
 }
 
 /**
@@ -852,8 +704,9 @@ EFI_DCS_TPM_PROTOCOL gEfiDcsTpmProtocol = {
   DcsUpdatePcr8,
   DcsGetRandom,
   DcsGetInfo,
-  DcsShowPcrs,
-  DcsShowNvIndices,
+  DcsReadPcr,
+  DcsEnumNvIndices,
+  DcsGetNvIndexInfo,
   DcsShutdown,
   // Buffer-based SRK API
   DcsSrkGetStatus,

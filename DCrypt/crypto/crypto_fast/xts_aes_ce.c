@@ -21,7 +21,7 @@
 #ifdef _M_ARM64
 
 #include <arm_neon.h>
-#if !defined(_KERNEL_MODE) && !defined(_UEFI)
+#ifndef _KERNEL_MODE
 #include <Windows.h>
 #endif
 #include "aes_key.h"
@@ -31,8 +31,8 @@
 /* Check for ARM64 Crypto Extensions support */
 int _stdcall xts_aes_ce_available(void)
 {
-#if defined(_KERNEL_MODE) || defined(_UEFI)
-    /* ARM64 Crypto Extensions are mandatory on Windows/UEFI ARM64 */
+#ifdef _KERNEL_MODE
+    /* ARM64 Crypto Extensions are mandatory on Windows ARM64 */
     return 1;
 #else
     return IsProcessorFeaturePresent(PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE);
@@ -132,40 +132,26 @@ void _stdcall aes256_arm64_decrypt(const unsigned char *in, unsigned char *out, 
 /* Polynomial for GF(2^128): x^128 + x^7 + x^2 + x + 1 = 0x87 in little-endian */
 static const unsigned char xts_poly[16] = { 0x87, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-/* GF(2^128) multiply by x for XTS tweak */
+/* GF(2^128) multiply by x for XTS tweak - branchless version */
 static __forceinline uint8x16_t neon_next_tweak(uint8x16_t tweak)
 {
-    uint8x16_t poly_vec = vld1q_u8(xts_poly);
-    int8x16_t  signed_tweak;
-    uint8x16_t carry;
-    unsigned char carry_bit;
-    uint64x2_t tweak64;
-    uint64x2_t shifted;
-    uint64x2_t carry_between;
-    unsigned __int64 carry_low;
-    uint8x16_t result;
-
-    /* Get the high bit of the last byte (bit 127) */
-    signed_tweak = vreinterpretq_s8_u8(tweak);
-    carry = vreinterpretq_u8_s8(vshrq_n_s8(signed_tweak, 7));
-
-    /* Extract carry from bit 127 */
-    carry_bit = vgetq_lane_u8(carry, 15);
+    /* Check if high bit is set (need to XOR with polynomial) */
+    int8x16_t  signed_tweak = vreinterpretq_s8_u8(tweak);
+    int8x16_t  mask = vshrq_n_s8(signed_tweak, 7);  /* All 1s if high bit set, else 0 */
+    uint8x16_t poly_mask = vreinterpretq_u8_s8(vdupq_laneq_s8(mask, 15)); /* Broadcast byte 15 */
 
     /* Shift left by 1 using 64-bit operations */
-    tweak64 = vreinterpretq_u64_u8(tweak);
-    shifted = vshlq_n_u64(tweak64, 1);
+    uint64x2_t tweak64 = vreinterpretq_u64_u8(tweak);
+    uint64x2_t shifted = vshlq_n_u64(tweak64, 1);
 
     /* Handle carry between the two 64-bit halves */
-    carry_between = vshrq_n_u64(tweak64, 63);
-    carry_low = vgetq_lane_u64(carry_between, 0);
-    shifted = vsetq_lane_u64(vgetq_lane_u64(shifted, 1) | carry_low, shifted, 1);
+    uint64x2_t carry_between = vshrq_n_u64(tweak64, 63);
+    shifted = vorrq_u64(shifted, vextq_u64(vdupq_n_u64(0), carry_between, 1));
 
-    /* XOR with polynomial if carry_bit was set */
-    result = vreinterpretq_u8_u64(shifted);
-    if (carry_bit & 1) {
-        result = veorq_u8(result, poly_vec);
-    }
+    /* Conditionally XOR with polynomial (0x87) using mask */
+    uint8x16_t result = vreinterpretq_u8_u64(shifted);
+    uint8x16_t poly_vec = vld1q_u8(xts_poly);
+    result = veorq_u8(result, vandq_u8(poly_mask, poly_vec));
 
     return result;
 }

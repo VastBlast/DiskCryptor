@@ -21,6 +21,7 @@
   CommonLib|Include/Library/CommonLib.h
   GraphLib|Include/Library/GraphLib.h
   PasswordLib|Include/Library/PasswordLib.h
+  ConsoleLib|Include/Library/ConsoleLib.h
   DcsCfgLib|Include/Library/DcsCfgLib.h
   DcsIntLib|Include/Library/DcsIntLib.h
 

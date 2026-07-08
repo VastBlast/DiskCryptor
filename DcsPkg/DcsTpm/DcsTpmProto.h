@@ -189,23 +189,53 @@ EFI_STATUS
 
 
 //
-// Show PCR Values
-// Displays PCR values used by sealed secret (or PCRs 0-8 if not configured)
+// Read PCR Value
+// Reads a single PCR value from the TPM
+// PcrIndex: PCR index (0-23)
+// PcrValue: Output buffer for PCR value (must be at least 64 bytes for SHA-512)
+// PcrSize: Out = actual PCR size
 //
 typedef
 EFI_STATUS
-(EFIAPI *EFI_DCS_TPM_SHOW_PCRS) (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+(EFIAPI *EFI_DCS_TPM_READ_PCR) (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                PcrIndex,
+  OUT UINT8                 *PcrValue,
+  OUT UINT32                *PcrSize
   );
 
 //
-// Show NV Indices
-// Lists all TPM NV indices with their attributes
+// Enumerate NV Indices
+// Lists all TPM NV indices
+// IndexList: Output array for NV indices
+// IndexCount: In = array size, Out = actual count
 //
 typedef
 EFI_STATUS
-(EFIAPI *EFI_DCS_TPM_SHOW_NV_INDICES) (
-  IN  EFI_DCS_TPM_PROTOCOL  *This
+(EFIAPI *EFI_DCS_TPM_ENUM_NV_INDICES) (
+  IN     EFI_DCS_TPM_PROTOCOL  *This,
+  OUT    UINT32                *IndexList,
+  IN OUT UINT32                *IndexCount
+  );
+
+//
+// Get NV Index Info
+// Returns attributes and size of an NV index
+// NvIndex: NV index to query
+// Attributes: Output for TPM NV attributes
+// DataSize: Output for data size
+// PcrRead: Output for PCR read mask (TPM 1.2 only, NULL ok)
+// PcrWrite: Output for PCR write mask (TPM 1.2 only, NULL ok)
+//
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DCS_TPM_GET_NV_INDEX_INFO) (
+  IN  EFI_DCS_TPM_PROTOCOL  *This,
+  IN  UINT32                NvIndex,
+  OUT UINT32                *Attributes,
+  OUT UINT32                *DataSize,
+  OUT UINT32                *PcrRead OPTIONAL,
+  OUT UINT32                *PcrWrite OPTIONAL
   );
 
 //
@@ -300,8 +330,9 @@ struct _EFI_DCS_TPM_PROTOCOL {
   EFI_DCS_TPM_UPDATE_PCR            UpdatePcr8;
   EFI_DCS_TPM_GET_RANDOM            GetRandom;
   EFI_DCS_TPM_GET_INFO              GetInfo;
-  EFI_DCS_TPM_SHOW_PCRS             ShowPcrs;
-  EFI_DCS_TPM_SHOW_NV_INDICES       ShowNvIndices;
+  EFI_DCS_TPM_READ_PCR              ReadPcr;
+  EFI_DCS_TPM_ENUM_NV_INDICES       EnumNvIndices;
+  EFI_DCS_TPM_GET_NV_INDEX_INFO     GetNvIndexInfo;
   EFI_DCS_TPM_SHUTDOWN              Shutdown;
 
   // Buffer-based SRK API (caller handles file I/O)

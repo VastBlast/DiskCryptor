@@ -1,0 +1,47 @@
+##  @file
+#   Console abstraction library
+#
+# Copyright (c) 2026. DiskCryptor, David Xanatos
+#
+# This program and the accompanying materials are licensed and made available
+# under the terms and conditions of the GNU Lesser General Public License, version 3.0 (LGPL-3.0).
+#
+# The full text of the license may be found at
+# https://opensource.org/licenses/LGPL-3.0
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010006
+  BASE_NAME                      = ConsoleLib
+  FILE_GUID                      = 8B3F7E2A-4C1D-49A8-B5E6-7F9D2C8A1B34
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = ConsoleLib|DXE_DRIVER DXE_RUNTIME_DRIVER UEFI_APPLICATION UEFI_DRIVER
+  CONSTRUCTOR                    = ConsoleLibConstructor
+
+#
+#  VALID_ARCHITECTURES           = IA32 X64 AARCH64
+#
+
+[Sources.common]
+  ConsoleInit.c
+  TextConsole.c
+  TouchConsole.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  DcsPkg/DcsPkg.dec
+
+[LibraryClasses]
+  MemoryAllocationLib
+  UefiLib
+  PrintLib
+  CommonLib
+  GraphLib
+
+[Protocols]
+  gEfiSimpleTextOutProtocolGuid
+  gEfiSimpleTextInProtocolGuid
+  gEfiGraphicsOutputProtocolGuid
+  gEfiAbsolutePointerProtocolGuid

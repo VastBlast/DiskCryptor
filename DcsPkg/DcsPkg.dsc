@@ -72,6 +72,7 @@
   CommonLib|DcsPkg/Library/CommonLib/CommonLib.inf
   GraphLib|DcsPkg/Library/GraphLib/GraphLib.inf
   PasswordLib|DcsPkg/Library/PasswordLib/PasswordLib.inf
+  ConsoleLib|DcsPkg/Library/ConsoleLib/ConsoleLib.inf
   RngLib|MdePkg/Library/BaseRngLib/BaseRngLib.inf
   DcsCfgLib|DcsPkg/Library/DcsCfgLib/DcsCfgLib.inf
   DcsIntLib|DcsPkg/Library/DcsIntLib/DcsIntLib.inf

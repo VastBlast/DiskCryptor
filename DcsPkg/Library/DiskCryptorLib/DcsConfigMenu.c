@@ -13,6 +13,7 @@ https://opensource.org/licenses/LGPL-3.0
 
 #include <Uefi.h>
 #include <Library/CommonLib.h>
+#include <Library/ConsoleLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <DcsConfig.h>
@@ -161,7 +162,7 @@ CfgPickerPcrMask(
 	UINT32 mask = (UINT32)*Value;
 	EFI_STATUS status;
 
-	gST->ConOut->ClearScreen(gST->ConOut);
+	g_Con->Clear();
 
 	status = DcTpmAskPcrMask(&mask, mask);
 	if (!EFI_ERROR(status)) {
@@ -225,14 +226,14 @@ CfgMenuDrawItem(
 	CHAR16 valBuf[CFG_VALUE_WIDTH + 1];
 	INT32 len;
 
-	gST->ConOut->SetCursorPosition(gST->ConOut, 0, Row);
+	g_Con->SetCursor(0, Row);
 
 	if (Selected)
-		OUT_PRINT(L"%V> ");
+		g_Con->Print(L"%V> ");
 	else
-		OUT_PRINT(L"  ");
+		g_Con->Print(L"  ");
 
-	OUT_PRINT(L"%-20s", Item->Label);
+	g_Con->Print(L"%-20s", Item->Label);
 
 	// Format value into fixed-width buffer, left-justified, space-padded
 	if (Item->DisplayFunc != NULL) {
@@ -280,10 +281,10 @@ CfgMenuDrawItem(
 		valBuf[CFG_VALUE_WIDTH] = L'\0';
 	}
 
-	OUT_PRINT(L"< %s >", valBuf);
+	g_Con->Print(L"< %s >", valBuf);
 
 	if (Selected)
-		OUT_PRINT(L"%N");
+		g_Con->Print(L"%N");
 }
 
 // Redraw only the value portion of a single item.
@@ -304,28 +305,28 @@ DcsShowHelp(
 	VOID
 )
 {
-	gST->ConOut->ClearScreen(gST->ConOut);
-	OUT_PRINT(L"=== DiskCryptor Boot Loader Help ===\r\n");
-	OUT_PRINT(L"\r\n");
-	OUT_PRINT(L"Password Entry:                        Editing:\r\n");
-	OUT_PRINT(L"  Enter      Submit password             Left/Right  Move cursor\r\n");
-	OUT_PRINT(L"  Esc        Cancel / Exit               Home/End    Jump to start/end\r\n");
-	OUT_PRINT(L"  Backspace  Delete previous char        Delete      Delete at cursor\r\n");
-	OUT_PRINT(L"                                         Insert      Insert space\r\n");
-	OUT_PRINT(L"\r\n");
-	OUT_PRINT(L"Function Keys:\r\n");
-	OUT_PRINT(L"  F1   Help                              F6   Configuration menu\r\n");
-	OUT_PRINT(L"                                         F7   Toggle keyfile\r\n");
-	OUT_PRINT(L"  F3   Force boot (skip decryption)      F8   Toggle hardware key\r\n");
-	OUT_PRINT(L"  F4   Add password                                                   \r\n");
-	OUT_PRINT(L"  F5   Toggle password visibility        F10  Save secret to TPM\r\n");
-	OUT_PRINT(L"\r\n");
-	OUT_PRINT(L"====================================\r\n");
-	OUT_PRINT(L"Press any key to return...\r\n");
+	g_Con->Clear();
+	g_Con->Print(L"=== DiskCryptor Boot Loader Help ===\r\n");
+	g_Con->Print(L"\r\n");
+	g_Con->Print(L"Password Entry:                        Editing:\r\n");
+	g_Con->Print(L"  Enter      Submit password             Left/Right  Move cursor\r\n");
+	g_Con->Print(L"  Esc        Cancel / Exit               Home/End    Jump to start/end\r\n");
+	g_Con->Print(L"  Backspace  Delete previous char        Delete      Delete at cursor\r\n");
+	g_Con->Print(L"                                         Insert      Insert space\r\n");
+	g_Con->Print(L"\r\n");
+	g_Con->Print(L"Function Keys:\r\n");
+	g_Con->Print(L"  F1   Help                              F6   Configuration menu\r\n");
+	g_Con->Print(L"                                         F7   Toggle keyfile\r\n");
+	g_Con->Print(L"  F3   Force boot (skip decryption)      F8   Toggle hardware key\r\n");
+	g_Con->Print(L"  F4   Add password                                                   \r\n");
+	g_Con->Print(L"  F5   Toggle password visibility        F10  Save secret to TPM\r\n");
+	g_Con->Print(L"\r\n");
+	g_Con->Print(L"====================================\r\n");
+	g_Con->Print(L"Press any key to return...\r\n");
 
-	GetKey();
-	FlushInputDelay(100000);
-	gST->ConOut->ClearScreen(gST->ConOut);
+	g_Con->GetKey();
+	g_Con->FlushInput(100000);
+	g_Con->Clear();
 }
 
 BOOLEAN
@@ -481,29 +482,33 @@ DcsConfigMenuShow(
 	count++;
 
 	// --- Initial full draw ---
-	gST->ConOut->ClearScreen(gST->ConOut);
-	OUT_PRINT(L"--- Configuration ---\r\n");
+	g_Con->Clear();
+	g_Con->Print(L"--- Configuration ---\r\n");
 
-	baseRow = gST->ConOut->Mode->CursorRow;
+	{
+		INT32 col, row;
+		g_Con->GetCursor(&col, &row);
+		baseRow = row;
+	}
 
 	for (i = 0; i < count; i++) {
 		CfgMenuDrawItem(&items[i], baseRow + i, (i == selected));
-		OUT_PRINT(L"\r\n");
+		g_Con->Print(L"\r\n");
 	}
 
-	OUT_PRINT(L"---------------------\r\n");
-	OUT_PRINT(L"Up/Down:select  Left/Right:change  Enter:apply  Esc:cancel\r\n");
+	g_Con->Print(L"---------------------\r\n");
+	g_Con->Print(L"Up/Down:select  Left/Right:change  Enter:apply  Esc:cancel\r\n");
 
-	gST->ConOut->EnableCursor(gST->ConOut, FALSE);
+	g_Con->EnableCursor(FALSE);
 
 	// --- Input loop: only redraw what changed ---
 	for (;;) {
-		key = GetKey();
-		FlushInputDelay(100000);
+		key = g_Con->GetKey();
+		g_Con->FlushInput(100000);
 
 		if (key.ScanCode == SCAN_ESC) {
-			gST->ConOut->EnableCursor(gST->ConOut, TRUE);
-			gST->ConOut->ClearScreen(gST->ConOut);
+			g_Con->EnableCursor(TRUE);
+			g_Con->Clear();
 			return FALSE;
 		}
 
@@ -535,16 +540,16 @@ DcsConfigMenuShow(
 			//if ((item = CfgFindItemById(items, count, CFG_ID_SECURE_BOOT)) != NULL)
 			//	DcsLdrSetMokSBState(CfgGetValue(item) ? 0 : 1);
 
-			gST->ConOut->EnableCursor(gST->ConOut, TRUE);
-			gST->ConOut->ClearScreen(gST->ConOut);
+			g_Con->EnableCursor(TRUE);
+			g_Con->Clear();
 
 			if (gDcsTpm != NULL && gDCryptTpmVersion > 0) {
-				OUT_PRINT(L"\n%HWarning: Saving the config file will modify PCR8 used for TPM sealing.%N\n");
+				g_Con->Print(L"\n%HWarning: Saving the config file will modify PCR8 used for TPM sealing.%N\n");
 			}
-			if (AskYesNo(L"\n%HSave changes permanently to config file?%N [y/N]: ", FALSE)) {
+			if (DcsAskYesNo(L"\n%HSave changes permanently to config file?%N [y/N]: ", FALSE)) {
 				DCAuthStoreConfig();
 			}
-			OUT_PRINT(L"\n");
+			g_Con->Print(L"\n");
 
 			return TRUE;
 		}
@@ -575,16 +580,20 @@ DcsConfigMenuShow(
 					items[selected].CurrentIndex = newValue;
 				}
 				// Redraw entire menu after picker returns (even on cancel)
-				gST->ConOut->ClearScreen(gST->ConOut);
-				OUT_PRINT(L"--- Configuration ---\r\n");
-				baseRow = gST->ConOut->Mode->CursorRow;
+				g_Con->Clear();
+				g_Con->Print(L"--- Configuration ---\r\n");
+				{
+					INT32 col, row;
+					g_Con->GetCursor(&col, &row);
+					baseRow = row;
+				}
 				for (i = 0; i < count; i++) {
 					CfgMenuDrawItem(&items[i], baseRow + i, (i == selected));
-					OUT_PRINT(L"\r\n");
+					g_Con->Print(L"\r\n");
 				}
-				OUT_PRINT(L"---------------------\r\n");
-				OUT_PRINT(L"Up/Down:select  Left/Right:change  Enter:apply  Esc:cancel\r\n");
-				gST->ConOut->EnableCursor(gST->ConOut, FALSE);
+				g_Con->Print(L"---------------------\r\n");
+				g_Con->Print(L"Up/Down:select  Left/Right:change  Enter:apply  Esc:cancel\r\n");
+				g_Con->EnableCursor(FALSE);
 			} else if (key.ScanCode == SCAN_RIGHT) {
 				if (items[selected].Values != NULL) {
 					// Named values: cycle through array
@@ -636,7 +645,7 @@ DCAuthStoreConfig(
 
 	// Check if config was initialized
 	if (gConfigFileName == NULL) {
-		ERR_PRINT(L"Config not initialized, cannot save.\n");
+		g_Con->PrintError(L"Config not initialized, cannot save.\n");
 		return EFI_NOT_READY;
 	}
 
@@ -733,7 +742,7 @@ DCAuthStoreConfig(
 	if (EFI_ERROR(Status)) goto cleanup;
 
 	if (gConfigDebug) {
-		OUT_PRINT(L"Configuration saved successfully.\n");
+		g_Con->Print(L"Configuration saved successfully.\n");
 	}
 
 cleanup:

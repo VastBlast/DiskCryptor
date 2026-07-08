@@ -630,3 +630,19 @@ InitConsoleControl() {
 	}
 	return res;
 }
+
+EFI_STATUS
+RestoreConsoleControl() {
+	EFI_STATUS	res = EFI_SUCCESS;
+	EFI_GUID   gConsoleControlProtocolGuid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
+	EFI_CONSOLE_CONTROL_PROTOCOL*	ConsoleControl;
+
+	if (gConsoleControlCount > 0 && gConsoleControlHandles != NULL) {
+		res = gBS->HandleProtocol(gConsoleControlHandles[0], &gConsoleControlProtocolGuid, (VOID**)&ConsoleControl);
+		if (!EFI_ERROR(res)) {
+			// Switch back to text mode
+			ConsoleControl->SetMode(ConsoleControl, EfiConsoleControlScreenText);
+		}
+	}
+	return res;
+}
