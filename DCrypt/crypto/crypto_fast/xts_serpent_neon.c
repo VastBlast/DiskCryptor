@@ -586,7 +586,7 @@ static __forceinline uint8x16_t neon_next_tweak(uint8x16_t tweak)
     /* Check if high bit is set (need to XOR with polynomial) */
     int8x16_t  signed_tweak = vreinterpretq_s8_u8(tweak);
     int8x16_t  mask = vshrq_n_s8(signed_tweak, 7);  /* All 1s if high bit set, else 0 */
-    uint8x16_t poly_mask = vreinterpretq_u8_s8(vdupq_laneq_s8(mask, 15)); /* Broadcast byte 15 */
+    uint8x16_t poly_mask = vreinterpretq_u8_s8(vdupq_n_s8(vgetq_lane_s8(mask, 15))); /* Broadcast byte 15 */
 
     /* Shift left by 1 using 64-bit operations */
     uint64x2_t tweak64 = vreinterpretq_u64_u8(tweak);
