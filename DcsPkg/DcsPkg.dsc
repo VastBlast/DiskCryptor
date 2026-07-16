@@ -76,7 +76,8 @@
   RngLib|MdePkg/Library/BaseRngLib/BaseRngLib.inf
   DcsCfgLib|DcsPkg/Library/DcsCfgLib/DcsCfgLib.inf
   DcsIntLib|DcsPkg/Library/DcsIntLib/DcsIntLib.inf
-  MiscUtilsLib|DcsPkg/MiscUtilsLib/MiscUtilsLib.inf
+  MiscUtilsLib|DcsPkg/Library/MiscUtilsLib/MiscUtilsLib.inf
+  SupportLib|DcsPkg/Library/SupportLib/SupportLib.inf
   DiskCryptorLib|DcsPkg/Library/DiskCryptorLib/DiskCryptorLib.inf
 
 # Architecture-specific overrides
