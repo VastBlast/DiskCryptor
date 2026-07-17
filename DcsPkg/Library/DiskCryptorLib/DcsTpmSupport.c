@@ -839,14 +839,18 @@ DcApplyBackup(
 			}
 		}
 		else {
-			tpm_backup *backup = (tpm_backup *)BackupBuffer;
+			tpm_backup* backup = (tpm_backup*)BackupBuffer;
 
-			g_Con->Print(L"Using stored PCR mask: 0x%x\n", backup->PcrMask);
+			if (gDCryptTpmPcrMask != backup->PcrMask) {
+				g_Con->Print(L"Using Current PCR mask: 0x%x (Original PCR mask: 0x%x)\n", gDCryptTpmPcrMask, backup->PcrMask);
+			} else {
+				g_Con->Print(L"Using PCR mask: 0x%x\n", gDCryptTpmPcrMask);
+			}
 
 			// Initialize options with stored values from backup
 			ZeroMem(&options, sizeof(DCS_TPM_SEAL_OPTIONS));
 			options.Size = sizeof(DCS_TPM_SEAL_OPTIONS);
-			options.PcrMask = backup->PcrMask;  // Use original PCR mask
+			options.PcrMask = gDCryptTpmPcrMask;
 			options.Flags = DCS_TPM_OPT_FLAG_NONE;
 
 			// Restore original PIN if stored in backup
